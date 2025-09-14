@@ -18,10 +18,10 @@
 ## 🚀 Live Demo
 
 ### 🌐 **Live Applications**
-- **🎪 Main User Platform**: [https://boxcricket-booking.vercel.app/](https://boxcricket-booking.vercel.app/)
+- **🎪 Main User Platform**: [https://box-junu.vercel.app](https://box-junu.vercel.app)
 - **🔧 Backend API**: [https://box-junu.onrender.com](https://box-junu.onrender.com)
-- **⚡ Admin Panel**: [Separate Deployment for admin]
-- **🏢 Ground Owner Panel**: [Development is for ground panel owner only]
+- **⚡ Admin Panel**: [Coming Soon - Separate Deployment]
+- **🏢 Ground Owner Panel**: [Under Development]
 
 ---
 
@@ -88,7 +88,7 @@
 
 ### 🚀 **Deployment & DevOps**
 - 🌐 **Render** - Backend hosting (Node.js)
-- ⚡ **Vercel** - Frontend hosting with CDN
+- ⚡ **Vercel** - Frontend hosting with global CDN
 - 🔧 **Environment Configs** - Production-ready setup
 - 📦 **CI/CD Ready** - Automated deployment pipelines
 
@@ -202,7 +202,7 @@ CASHFREE_API_URL=https://api.cashfree.com/pg
 ## 🌐 Production Deployment
 
 ### 🏗️ **Architecture Overview**
-- **Frontend**: Deployed on Netlify with CDN
+- **Frontend**: Deployed on Vercel with CDN
 - **Backend**: Deployed on Render with auto-scaling
 - **Database**: MongoDB Atlas with global clusters
 - **Payments**: Cashfree production environment
@@ -221,7 +221,7 @@ CASHFREE_API_URL=https://api.cashfree.com/pg
    NODE_ENV=production
    RENDER=true
    PORT=10000
-   FRONTEND_URL=https://boxcric.netlify.app
+   FRONTEND_URL=https://box-junu.vercel.app
    # Add all other environment variables from your .env
    ```
 
@@ -229,21 +229,23 @@ CASHFREE_API_URL=https://api.cashfree.com/pg
    - Path: `/api/health`
    - The app includes automatic health monitoring
 
-### ⚡ **Frontend Deployment (Netlify)**
+### ⚡ **Frontend Deployment (Vercel)**
 
 1. **Connect Repository**
-   - Link your GitHub repository to Netlify
-   - Set build command: `npm run build`
-   - Set publish directory: `dist`
+   - Link your GitHub repository to Vercel
+   - Vercel will automatically detect it's a Vite project
+   - Set build command: `npm run build` (auto-detected)
+   - Set output directory: `dist` (auto-detected)
 
 2. **Environment Variables**
    ```bash
    VITE_API_URL=https://box-junu.onrender.com/api
    ```
 
-3. **Automatic Redirects**
-   - The `netlify.toml` file handles SPA routing
-   - API requests are proxied to Render backend
+3. **Automatic Configuration**
+   - The `vercel.json` file handles SPA routing
+   - All routes redirect to `/index.html` for client-side routing
+   - Automatic CDN and global edge network
 
 ---
 
@@ -258,7 +260,7 @@ npm run dev:backend      # Start only backend (Node.js)
 # 🏗️ Building
 npm run build            # Build for production
 npm run build:render     # Build for Render deployment
-npm run build:netlify    # Build for Netlify deployment
+npm run build:vercel     # Build for Vercel deployment
 
 # 🧪 Testing
 npm run test             # Run test suite
@@ -304,7 +306,6 @@ box-junu/
 ├── 📄 vite.config.ts         # Vite configuration
 ├── 📄 tailwind.config.ts     # Tailwind CSS config
 ├── 📄 render.yaml            # Render deployment config
-├── 📄 netlify.toml           # Netlify deployment config
 └── 📄 vercel.json            # Vercel deployment config
 ```
 
@@ -450,7 +451,7 @@ We love contributions! Here's how you can help make BoxCric even better:
 - 🍃 **MongoDB** - For the flexible database solution
 - 💳 **Cashfree** - For reliable payment processing
 - 🎨 **Tailwind CSS** - For beautiful, utility-first styling
-- 🚀 **Render & Netlify** - For seamless deployment solutions
+- 🚀 **Render & Vercel** - For seamless deployment solutions
 
 ---
 
@@ -458,7 +459,7 @@ We love contributions! Here's how you can help make BoxCric even better:
   <h2>🎯 Ready to Book Your Next Game?</h2>
   <p><strong>Experience the future of box cricket booking with BoxCric!</strong></p>
   
-  ### 🌟 **[Start Playing Now!](https://boxcric.netlify.app)** 🌟
+  ### 🌟 **[Start Playing Now!](https://box-junu.vercel.app)** 🌟
   
   <p><em>Made with ❤️ for cricket enthusiasts everywhere</em></p>
 </div>
