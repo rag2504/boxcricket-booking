@@ -18,10 +18,10 @@
 ## 🚀 Live Demo
 
 ### 🌐 **Live Applications**
-- **🎪 Main User Platform**: [https://box-junu.vercel.app](https://box-junu.vercel.app)
+- **🎪 Main User Platform**: [https://boxcricket-booking.vercel.app/](https://boxcricket-booking.vercel.app/)
 - **🔧 Backend API**: [https://box-junu.onrender.com](https://box-junu.onrender.com)
-- **⚡ Admin Panel**: [Coming Soon - Separate Deployment]
-- **🏢 Ground Owner Panel**: [Under Development]
+- **⚡ Admin Panel**: [Separate Deployment for admin]
+- **🏢 Ground Owner Panel**: [Development for ground owner panel]
 
 ---
 
