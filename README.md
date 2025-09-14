@@ -459,7 +459,7 @@ We love contributions! Here's how you can help make BoxCric even better:
   <h2>🎯 Ready to Book Your Next Game?</h2>
   <p><strong>Experience the future of box cricket booking with BoxCric!</strong></p>
   
-  ### 🌟 **[Start Playing Now!](https://box-junu.vercel.app)** 🌟
+  ### 🌟 **[Start Playing Now!](https://boxcricket-booking.vercel.app/)** 🌟
   
   <p><em>Made with ❤️ for cricket enthusiasts everywhere</em></p>
 </div>
