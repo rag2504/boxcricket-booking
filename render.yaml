@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: box-junu
+    env: node
+    plan: free
+    branch: main
+    buildCommand: npm install
+    startCommand: npm run start:render
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RENDER
+        value: true
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: CASHFREE_APP_ID
+        sync: false
+      - key: CASHFREE_SECRET_KEY
+        sync: false
+      - key: CASHFREE_API_URL
+        value: https://api.cashfree.com/pg
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: 587
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        value: https://boxcric.netlify.app
+
+databases:
+  - name: boxcric-db
+    databaseName: boxcricket
+    plan: free
