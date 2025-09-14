@@ -88,7 +88,7 @@
 
 ### 🚀 **Deployment & DevOps**
 - 🌐 **Render** - Backend hosting (Node.js)
-- ⚡ **Netlify** - Frontend hosting with CDN
+- ⚡ **Vercel** - Frontend hosting with CDN
 - 🔧 **Environment Configs** - Production-ready setup
 - 📦 **CI/CD Ready** - Automated deployment pipelines
 
