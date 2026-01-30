@@ -45,14 +45,18 @@ const createTransporter = () => {
       socketTimeout: 15000,
     });
     
-    // Verify the connection configuration
-    transport.verify(function(error, success) {
-      if (error) {
-        console.error("❌ Email transport verification failed:", error);
-      } else {
-        console.log("✅ Email transport verified successfully!");
-      }
-    });
+    // Verify the connection configuration only in production
+    if (process.env.NODE_ENV === 'production') {
+      transport.verify(function(error, success) {
+        if (error) {
+          console.error("❌ Email transport verification failed:", error);
+        } else {
+          console.log("✅ Email transport verified successfully!");
+        }
+      });
+    } else {
+      console.log("⚠️ Email verification skipped in development mode");
+    }
     
     return transport;
   } catch (error) {

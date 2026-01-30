@@ -400,8 +400,17 @@ const PaymentModal = ({
         throw new Error("Payment app ID missing from server response.");
       }
 
-      // Use Cashfree SDK for checkout
-      if (typeof window.Cashfree !== 'undefined') {
+      // Check if this is a mock payment (development mode)
+      if (order.mock || order.payment_url?.includes('localhost') || order.mode === 'development') {
+        console.log("🧪 Development mode: Handling mock payment");
+        
+        // For mock payments, directly redirect to the callback URL
+        window.location.href = order.payment_url;
+        return;
+      }
+
+      // Use Cashfree SDK for checkout (production only)
+      if (typeof window.Cashfree !== 'undefined' && window.location.hostname !== 'localhost') {
         const cashfree = window.Cashfree({
           mode: order.mode || "production"
         });
@@ -414,9 +423,14 @@ const PaymentModal = ({
         console.log("Opening Cashfree checkout with:", checkoutOptions);
         cashfree.checkout(checkoutOptions);
       } else {
-        // Fallback to direct redirect if SDK not loaded
-        const cashfreeUrl = order.payment_url || `https://payments.cashfree.com/pg/view/${order.payment_session_id}`;
-        window.location.href = cashfreeUrl;
+        // Fallback to direct redirect if SDK not loaded or in development
+        if (window.location.hostname === 'localhost') {
+          console.log("🧪 Development mode: Redirecting to mock payment URL");
+          window.location.href = order.payment_url;
+        } else {
+          const cashfreeUrl = order.payment_url || `https://payments.cashfree.com/pg/view/${order.payment_session_id}`;
+          window.location.href = cashfreeUrl;
+        }
       }
 
       // Poll for payment completion

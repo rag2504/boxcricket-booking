@@ -8,8 +8,19 @@
     <script>
       window.jsxDEV = function() { return null; };
     </script>
-    <!-- Cashfree SDK -->
-    <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+    
+    <!-- Cashfree SDK - Only load in production -->
+    <script>
+      // Only load Cashfree SDK if not in development mode
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        const script = document.createElement('script');
+        script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+        script.async = true;
+        document.head.appendChild(script);
+      } else {
+        console.log('🧪 Development mode: Cashfree SDK not loaded');
+      }
+    </script>
 
     <!-- PDF Generation Libraries (CDN fallback) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>

@@ -37,11 +37,119 @@ const PaymentCallback = () => {
         const orderId = getQueryParam(location.search, "order_id");
         const paymentSessionId = getQueryParam(location.search, "payment_session_id");
         const txStatus = getQueryParam(location.search, "txStatus") || getQueryParam(location.hash, "txStatus");
+        const orderStatus = getQueryParam(location.search, "order_status");
+        const isMock = getQueryParam(location.search, "mock") === "true";
 
-        console.log("Payment callback params:", { bookingId, orderId, paymentSessionId, txStatus });
+        console.log("Payment callback params:", { bookingId, orderId, paymentSessionId, txStatus, orderStatus, isMock });
 
         if (!bookingId) {
           setError("No booking ID found in callback URL.");
+          setLoading(false);
+          return;
+        }
+
+        // Handle mock payments (development mode)
+        if (isMock || orderId?.startsWith('mock_')) {
+          console.log("🧪 Development mode: Handling mock payment callback");
+          
+          try {
+            const token = localStorage.getItem("boxcric_token");
+            const verifyResponse = await fetch(`${API_BASE_URL}/payments/verify-payment`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                order_id: orderId || `mock_order_${Date.now()}`,
+                payment_session_id: paymentSessionId || `mock_session_${Date.now()}`,
+                bookingId: bookingId,
+                mock: true
+              })
+            });
+
+            const verifyData = await verifyResponse.json();
+            console.log("Mock payment verification response:", verifyData);
+
+            if (verifyData.success) {
+              setPaymentStatus({
+                status: "SUCCESS",
+                bookingId,
+                orderId: orderId || `mock_order_${Date.now()}`,
+                amount: verifyData.booking?.pricing?.totalAmount,
+                bookingDetails: verifyData.booking
+              });
+              setLoading(false);
+              return;
+            } else {
+              console.error("Mock payment verification failed:", verifyData.message);
+              setPaymentStatus({
+                status: "FAILED",
+                bookingId,
+                orderId
+              });
+              setLoading(false);
+              return;
+            }
+          } catch (verifyError) {
+            console.error("Mock payment verification error:", verifyError);
+            setPaymentStatus({
+              status: "FAILED",
+              bookingId,
+              orderId
+            });
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Handle order_status parameter (for mock payments with status)
+        if (orderStatus) {
+          console.log("Using order_status from URL:", orderStatus);
+          const status = mapCashfreeStatus(orderStatus);
+          
+          if (status === "SUCCESS") {
+            // Verify the payment for successful mock payments
+            try {
+              const token = localStorage.getItem("boxcric_token");
+              const verifyResponse = await fetch(`${API_BASE_URL}/payments/verify-payment`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  order_id: orderId || `mock_order_${Date.now()}`,
+                  payment_session_id: paymentSessionId || `mock_session_${Date.now()}`,
+                  bookingId: bookingId,
+                  mock: true
+                })
+              });
+
+              const verifyData = await verifyResponse.json();
+              console.log("Payment verification response:", verifyData);
+
+              if (verifyData.success) {
+                setPaymentStatus({
+                  status: "SUCCESS",
+                  bookingId,
+                  orderId,
+                  amount: verifyData.booking?.pricing?.totalAmount,
+                  bookingDetails: verifyData.booking
+                });
+                setLoading(false);
+                return;
+              }
+            } catch (verifyError) {
+              console.error("Payment verification error:", verifyError);
+            }
+          }
+          
+          setPaymentStatus({
+            status,
+            bookingId,
+            orderId
+          });
           setLoading(false);
           return;
         }

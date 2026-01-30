@@ -302,6 +302,42 @@ router.post("/create-order", authMiddleware, async (req, res) => {
       });
     }
 
+    // Development mode - mock payment
+    if (IS_DEVELOPMENT || !CASHFREE_APP_ID || CASHFREE_APP_ID === 'TEST') {
+      console.log("🧪 Development mode: Creating mock payment order");
+      
+      const mockOrderId = `mock_order_${booking._id}_${Date.now()}`;
+      const mockPaymentSessionId = `mock_session_${Date.now()}`;
+      
+      // Update booking with mock payment order details
+      booking.payment = {
+        ...booking.payment,
+        cashfreeOrderId: mockOrderId,
+        status: "pending"
+      };
+      await booking.save();
+
+      console.log("Mock payment order created:", mockOrderId);
+
+      // Generate mock payment URL (will redirect to success page)
+      const mockPaymentUrl = `http://localhost:8080/payment/callback?booking_id=${booking._id}&order_id=${mockOrderId}&order_status=PAID&mock=true`;
+
+      return res.json({
+        success: true,
+        order: {
+          id: mockOrderId,
+          amount: totalAmount,
+          currency: "INR",
+          payment_session_id: mockPaymentSessionId,
+          order_status: "ACTIVE",
+          payment_url: mockPaymentUrl,
+        },
+        appId: "MOCK_APP_ID",
+        mode: "development",
+        mock: true
+      });
+    }
+
     // Create Cashfree order using SDK
     const orderData = {
       order_id: `order_${booking._id}_${Date.now()}`,
@@ -411,14 +447,67 @@ router.post("/verify-payment", authMiddleware, async (req, res) => {
       order_id,
       payment_session_id,
       bookingId,
+      mock
     } = req.body;
 
     const userId = req.userId;
-    console.log("🔍 Payment verification request:", { order_id, payment_session_id, bookingId, userId });
+    console.log("🔍 Payment verification request:", { order_id, payment_session_id, bookingId, userId, mock });
 
     if (!bookingId || bookingId === "undefined") {
       console.log("❌ Invalid booking ID:", bookingId);
       return res.status(400).json({ success: false, message: "Invalid booking ID" });
+    }
+
+    // Handle mock payment verification for development
+    if (mock || IS_DEVELOPMENT || order_id?.startsWith('mock_')) {
+      console.log("🧪 Development mode: Mock payment verification");
+      
+      // Find the booking in MongoDB
+      const booking = await Booking.findOne({
+        _id: bookingId,
+        userId
+      }).populate("groundId", "name location price features");
+
+      if (!booking) {
+        console.log("❌ Booking not found:", bookingId);
+        return res.status(404).json({
+          success: false,
+          message: "Booking not found",
+        });
+      }
+
+      console.log("✅ Found booking:", booking.bookingId, "current status:", booking.status);
+
+      // Update booking with mock payment details
+      booking.payment = {
+        ...booking.payment,
+        cashfreeOrderId: order_id || `mock_order_${Date.now()}`,
+        cashfreePaymentSessionId: payment_session_id || `mock_session_${Date.now()}`,
+        status: "completed",
+        paidAt: new Date(),
+        paymentDetails: {
+          order_status: 'PAID',
+          order_amount: booking.pricing?.totalAmount || 500,
+          payment_method: 'MOCK_PAYMENT'
+        }
+      };
+      
+      booking.status = "confirmed";
+      booking.confirmation = {
+        confirmedAt: new Date(),
+        confirmationCode: `BC${Date.now().toString().slice(-6)}`,
+        confirmedBy: "mock_payment"
+      };
+
+      await booking.save();
+      console.log("✅ Mock payment verified! Booking confirmed:", booking.bookingId);
+
+      return res.json({
+        success: true,
+        message: "Mock payment verified and booking confirmed!",
+        booking: booking.toObject(),
+        mock: true
+      });
     }
 
     // Verify payment with Cashfree using SDK
