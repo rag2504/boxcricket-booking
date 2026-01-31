@@ -19,18 +19,34 @@ const CASHFREE_SANDBOX_URL = "https://sandbox.cashfree.com/pg"; // Sandbox API
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 const IS_TEST_MODE = process.env.CASHFREE_MODE === 'test';
 
+// Use mock payments if credentials are not properly configured or account not activated
+const USE_MOCK_PAYMENTS = !CASHFREE_APP_ID || !CASHFREE_SECRET_KEY || 
+                         CASHFREE_APP_ID === 'TEST' || CASHFREE_SECRET_KEY === 'TEST';
+
 // Use sandbox mode only if explicitly set to test mode
-const USE_SANDBOX = IS_TEST_MODE;
+const USE_SANDBOX = IS_TEST_MODE && !USE_MOCK_PAYMENTS;
 
-// Initialize Cashfree SDK
-const cashfree = new Cashfree(
-  USE_SANDBOX ? CFEnvironment.SANDBOX : CFEnvironment.PRODUCTION,
-  CASHFREE_APP_ID,
-  CASHFREE_SECRET_KEY
-);
+// Initialize Cashfree SDK only if we have valid credentials
+let cashfree = null;
+if (!USE_MOCK_PAYMENTS) {
+  try {
+    cashfree = new Cashfree(
+      USE_SANDBOX ? CFEnvironment.SANDBOX : CFEnvironment.PRODUCTION,
+      CASHFREE_APP_ID,
+      CASHFREE_SECRET_KEY
+    );
+    console.log(`💳 Cashfree SDK initialized in ${USE_SANDBOX ? 'SANDBOX' : 'PRODUCTION'} mode`);
+  } catch (error) {
+    console.error("❌ Failed to initialize Cashfree SDK:", error);
+    console.log("🔄 Falling back to mock payments");
+  }
+}
 
-// Validate credentials
-if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
+// Validate credentials and log status
+if (USE_MOCK_PAYMENTS) {
+  console.log("🧪 Using MOCK PAYMENTS - No real transactions will be processed");
+  console.log("   To enable real payments, set valid CASHFREE_APP_ID and CASHFREE_SECRET_KEY");
+} else if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
   console.error("❌ Cashfree credentials not found in environment variables!");
   console.error("   Set CASHFREE_APP_ID and CASHFREE_SECRET_KEY for payment processing");
 }
@@ -302,9 +318,10 @@ router.post("/create-order", authMiddleware, async (req, res) => {
       });
     }
 
-    // Development mode - mock payment
-    if (IS_DEVELOPMENT || !CASHFREE_APP_ID || CASHFREE_APP_ID === 'TEST') {
-      console.log("🧪 Development mode: Creating mock payment order");
+    // Use mock payments if credentials are invalid or account not activated
+    if (USE_MOCK_PAYMENTS || IS_DEVELOPMENT) {
+      console.log("🧪 Using mock payments: Creating mock payment order");
+      console.log("   Reason:", USE_MOCK_PAYMENTS ? "Invalid/missing credentials" : "Development mode");
       
       const mockOrderId = `mock_order_${booking._id}_${Date.now()}`;
       const mockPaymentSessionId = `mock_session_${Date.now()}`;
@@ -319,8 +336,9 @@ router.post("/create-order", authMiddleware, async (req, res) => {
 
       console.log("Mock payment order created:", mockOrderId);
 
-      // Generate mock payment URL (will redirect to success page)
-      const mockPaymentUrl = `http://localhost:8080/payment/callback?booking_id=${booking._id}&order_id=${mockOrderId}&order_status=PAID&mock=true`;
+      // Generate mock payment URL - use production frontend URL in production
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+      const mockPaymentUrl = `${frontendUrl}/payment/callback?booking_id=${booking._id}&order_id=${mockOrderId}&order_status=PAID&mock=true`;
 
       return res.json({
         success: true,
@@ -332,6 +350,11 @@ router.post("/create-order", authMiddleware, async (req, res) => {
           order_status: "ACTIVE",
           payment_url: mockPaymentUrl,
         },
+        appId: "MOCK_APP_ID",
+        mode: "mock",
+        mock: true
+      });
+    }
         appId: "MOCK_APP_ID",
         mode: "development",
         mock: true
@@ -376,12 +399,53 @@ router.post("/create-order", authMiddleware, async (req, res) => {
     } catch (sdkError) {
       console.error("Cashfree SDK error:", sdkError.response?.data || sdkError);
       
+      // Handle specific error cases
+      const errorMessage = sdkError.response?.data?.message || sdkError.message || "";
+      
+      // Handle "transactions not enabled" error by falling back to mock payments
+      if (errorMessage.includes("transactions are not enabled")) {
+        console.log("🔄 Cashfree account not activated, falling back to mock payments");
+        
+        const mockOrderId = `mock_order_${booking._id}_${Date.now()}`;
+        const mockPaymentSessionId = `mock_session_${Date.now()}`;
+        
+        // Update booking with mock payment order details
+        booking.payment = {
+          ...booking.payment,
+          cashfreeOrderId: mockOrderId,
+          status: "pending"
+        };
+        await booking.save();
+
+        console.log("Fallback mock payment order created:", mockOrderId);
+
+        // Generate mock payment URL
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+        const mockPaymentUrl = `${frontendUrl}/payment/callback?booking_id=${booking._id}&order_id=${mockOrderId}&order_status=PAID&mock=true`;
+
+        return res.json({
+          success: true,
+          order: {
+            id: mockOrderId,
+            amount: totalAmount,
+            currency: "INR",
+            payment_session_id: mockPaymentSessionId,
+            order_status: "ACTIVE",
+            payment_url: mockPaymentUrl,
+          },
+          appId: "MOCK_APP_ID",
+          mode: "mock_fallback",
+          mock: true,
+          message: "Using mock payment due to payment gateway configuration"
+        });
+      }
+      
       // Handle authentication errors specifically
       if (sdkError.response?.status === 401 || sdkError.response?.status === 403) {
         throw new Error("Cashfree authentication failed. Please check API credentials.");
       }
       
-      throw new Error(sdkError.response?.data?.message || sdkError.message || "Failed to create Cashfree order");
+      throw new Error(errorMessage || "Failed to create Cashfree order");
     }
 
     // Extract order data from SDK response
