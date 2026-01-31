@@ -11,7 +11,7 @@ console.log("🔗 API Base URL:", API_BASE_URL);
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // Increased from 10s to 30s
+  timeout: 60000, // 60 seconds for better reliability on slow connections
   headers: {
     "Content-Type": "application/json",
   },

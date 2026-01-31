@@ -226,19 +226,19 @@ router.post("/register", async (req, res) => {
       ipAddress: req.ip,
     });
 
-    // Send OTP email (non-blocking)
-    try {
-      await sendOTPEmail(email, otp, "registration");
+    // Send OTP email asynchronously (don't wait for it to complete)
+    sendOTPEmail(email, otp, "registration").then(() => {
       console.log(`✅ OTP email sent successfully to ${email}`);
-    } catch (emailError) {
+    }).catch(emailError => {
       console.error(`⚠️ Email sending failed for ${email}:`, emailError.message);
       // Don't block registration if email fails - OTP is still saved in database
       console.log(`📧 OTP for ${email}: ${otp} (email failed, logging to console)`);
-    }
+    });
 
     // Store user data temporarily (you might want to use Redis for this)
     const tempUserData = { name, email, phone, password };
 
+    // Respond immediately without waiting for email
     res.status(200).json({
       success: true,
       message:
@@ -455,9 +455,13 @@ router.post("/request-login-otp", async (req, res) => {
       ipAddress: req.ip,
     });
 
-    // Send OTP email
-    await sendOTPEmail(email, otp, "login");
+    // Send OTP email asynchronously (don't wait for it to complete)
+    sendOTPEmail(email, otp, "login").catch(error => {
+      console.error("Background email sending failed:", error);
+      // Email failure is logged but doesn't affect the API response
+    });
 
+    // Respond immediately without waiting for email
     res.json({
       success: true,
       message: "OTP sent to your email",

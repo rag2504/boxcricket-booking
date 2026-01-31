@@ -693,13 +693,12 @@ router.post("/verify-payment", authMiddleware, async (req, res) => {
           }
         }
         
-        const emailResult = await sendBookingReceiptEmail(bookingForEmail, user);
-        console.log(`📧 Receipt email result:`, emailResult.success ? 'SUCCESS' : `FAILED - ${emailResult.message}`);
-        
-        if (!emailResult.success) {
-          console.error(`❌ Email failed for booking ${booking.bookingId}:`, emailResult.error);
-          // Log the failure but don't fail the payment verification
-        }
+        // Send booking receipt email after payment confirmation (non-blocking)
+        sendBookingReceiptEmail(bookingForEmail, user).then(emailResult => {
+          console.log(`📧 Receipt email result:`, emailResult.success ? 'SUCCESS' : `FAILED - ${emailResult.message}`);
+        }).catch(emailError => {
+          console.error("❌ Failed to send receipt email:", emailError.message);
+        });
       } else {
         console.error(`❌ No user or email found for booking ${booking.bookingId}`);
       }
@@ -859,13 +858,12 @@ router.post("/webhook", async (req, res) => {
             }
           }
           
-          const emailResult = await sendBookingReceiptEmail(bookingForEmail, user);
-          console.log(`📧 Webhook: Receipt email result:`, emailResult.success ? 'SUCCESS' : `FAILED - ${emailResult.message}`);
-          
-          if (!emailResult.success) {
-            console.error(`❌ Webhook: Email failed for booking ${booking.bookingId}:`, emailResult.error);
-            // Log the failure but don't fail the webhook
-          }
+          // Send receipt email if payment was successful (non-blocking)
+          sendBookingReceiptEmail(bookingForEmail, user).then(emailResult => {
+            console.log(`📧 Webhook: Receipt email result:`, emailResult.success ? 'SUCCESS' : `FAILED - ${emailResult.message}`);
+          }).catch(emailError => {
+            console.error("❌ Webhook: Failed to send receipt email:", emailError.message);
+          });
         } else {
           console.error(`❌ Webhook: No user or email found for booking ${booking.bookingId}`);
         }
