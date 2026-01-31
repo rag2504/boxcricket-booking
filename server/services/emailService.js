@@ -47,16 +47,22 @@ const createTransporter = () => {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
-      // Add timeout to prevent hanging connections
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
-      // Add additional options for better compatibility
+      // Optimized timeouts for hosting platforms like Render
+      connectionTimeout: Number(process.env.EMAIL_TIMEOUT) || 30000, // Configurable timeout
+      greetingTimeout: Number(process.env.EMAIL_TIMEOUT) || 30000,
+      socketTimeout: Number(process.env.EMAIL_TIMEOUT) || 60000,
+      // Additional options for better compatibility with hosting platforms
       tls: {
-        rejectUnauthorized: false
+        rejectUnauthorized: false,
+        ciphers: 'SSLv3'
       },
-      debug: true, // Enable debug logging
-      logger: true // Enable logger
+      // Retry configuration
+      pool: true,
+      maxConnections: 1,
+      maxMessages: 3,
+      // Disable debug in production to reduce logs
+      debug: process.env.NODE_ENV !== 'production',
+      logger: process.env.NODE_ENV !== 'production'
     });
 
     // Test the connection (don't await here, do it when sending)

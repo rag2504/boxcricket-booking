@@ -39,24 +39,28 @@ const createTransporter = () => {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
-      // Add timeout to prevent hanging connections
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
+      // Optimized timeouts for hosting platforms like Render
+      connectionTimeout: Number(process.env.EMAIL_TIMEOUT) || 30000, // Configurable timeout
+      greetingTimeout: Number(process.env.EMAIL_TIMEOUT) || 30000,
+      socketTimeout: Number(process.env.EMAIL_TIMEOUT) || 60000,
+      // Additional options for better compatibility with hosting platforms
+      tls: {
+        rejectUnauthorized: false,
+        ciphers: 'SSLv3'
+      },
+      // Retry configuration
+      pool: true,
+      maxConnections: 1,
+      maxMessages: 3,
+      // Disable debug in production to reduce logs
+      debug: process.env.NODE_ENV !== 'production',
+      logger: process.env.NODE_ENV !== 'production'
     });
     
-    // Verify the connection configuration only in production
-    if (process.env.NODE_ENV === 'production') {
-      transport.verify(function(error, success) {
-        if (error) {
-          console.error("❌ Email transport verification failed:", error);
-        } else {
-          console.log("✅ Email transport verified successfully!");
-        }
-      });
-    } else {
-      console.log("⚠️ Email verification skipped in development mode");
-    }
+    // Skip email verification in production to avoid startup delays
+    // Email verification will happen when actually sending emails
+    console.log("⚠️ Email verification skipped in production to avoid startup delays");
+    console.log("📧 Email will be verified when sending first email");
     
     return transport;
   } catch (error) {
