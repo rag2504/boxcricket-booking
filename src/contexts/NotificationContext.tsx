@@ -1,13 +1,21 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { useAuth } from "./AuthContext";
-import { getAuthToken } from "@/lib/api";
+import { notificationsApi } from "@/lib/api";
 
-// Notification types
 interface Notification {
   _id: string;
   title: string;
   message: string;
-  type: "booking_pending" | "booking_confirmed" | "booking_cancelled" | "booking_reminder" | "payment_success" | "payment_failed" | "admin_broadcast" | "system" | "promotion";
+  type:
+    | "booking_pending"
+    | "booking_confirmed"
+    | "booking_cancelled"
+    | "booking_reminder"
+    | "payment_success"
+    | "payment_failed"
+    | "admin_broadcast"
+    | "system"
+    | "promotion";
   priority: "low" | "medium" | "high" | "urgent";
   isRead: boolean;
   readAt?: string;
@@ -18,7 +26,7 @@ interface Notification {
     groundId?: string;
     amount?: number;
     actionUrl?: string;
-    metadata?: any;
+    metadata?: unknown;
   };
   sentBy?: string;
   isGlobal?: boolean;
@@ -34,7 +42,9 @@ interface NotificationContextType {
   refreshNotifications: () => void;
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+const NotificationContext = createContext<NotificationContextType | undefined>(
+  undefined
+);
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
@@ -53,99 +63,48 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  // API call helper with admin panel server base URL
-  const apiCall = async (endpoint: string, options?: RequestInit) => {
-    const baseURL = import.meta.env.VITE_ADMIN_API_URL || "http://localhost:3001"; // Admin panel server URL
-    const url = endpoint.startsWith("http") ? endpoint : `${baseURL}${endpoint}`;
-    
-    const response = await fetch(url, {
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
-      ...options,
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  };
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!user?.id || !isAuthenticated) {
-      console.log("⚠️ User not authenticated, skipping notification fetch");
-      console.log("⚠️ User state:", { user, isAuthenticated });
       return;
     }
-    
+
     console.log("🔄 Fetching notifications for user:", user.id);
-    console.log("🔄 Full user object:", user);
-    const baseURL = import.meta.env.VITE_ADMIN_API_URL || "http://localhost:3001";
-    console.log("🔄 API URL will be:", `${baseURL}/api/notifications/`);
-    
     setLoading(true);
     try {
-      // Get auth token from localStorage
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
+      const response = (await notificationsApi.getNotifications()) as {
+        success?: boolean;
+        notifications?: Notification[];
+        message?: string;
+      };
 
-      const response = await apiCall(`/api/notifications/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      console.log("📱 User notifications response:", response);
-      console.log("📱 Response status and data:", { 
-        success: response.success, 
-        notificationCount: response.notifications?.length,
-        error: response.message 
-      });
-      
       if (response.success) {
         setNotifications(response.notifications || []);
         console.log("✅ Loaded", response.notifications?.length || 0, "notifications");
       } else {
-        console.error("❌ Failed to fetch notifications:", response.message || response.error);
+        console.error("❌ Failed to fetch notifications:", response.message);
       }
     } catch (error) {
-      console.error("❌ Error fetching notifications:", error);
-      console.error("❌ Error details:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
+      const err = error as { message?: string };
+      console.error("❌ Error fetching notifications:", err.message || error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, isAuthenticated]);
 
   const markAsRead = async (notificationId: string) => {
     if (!user?.id) return;
-    
-    try {
-      // Get auth token from localStorage
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
 
-      const response = await apiCall(`/api/notifications/${notificationId}/read`, {
-        method: "PATCH",
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
+    try {
+      const response = (await notificationsApi.markAsRead(notificationId)) as {
+        success?: boolean;
+      };
+
       if (response.success) {
-        setNotifications(prev => 
-          prev.map(notification => 
-            notification._id === notificationId 
+        setNotifications((prev) =>
+          prev.map((notification) =>
+            notification._id === notificationId
               ? { ...notification, isRead: true, readAt: new Date().toISOString() }
               : notification
           )
@@ -160,23 +119,17 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     if (!user?.id) return;
 
     try {
-      // Get auth token from localStorage
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
+      const response = (await notificationsApi.markAllAsRead()) as {
+        success?: boolean;
+      };
 
-      // Use the dedicated endpoint for marking all as read
-      const response = await apiCall(`/api/notifications/read-all`, {
-        method: "PATCH",
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
       if (response.success) {
-        setNotifications(prev => 
-          prev.map(notification => ({ ...notification, isRead: true, readAt: new Date().toISOString() }))
+        setNotifications((prev) =>
+          prev.map((notification) => ({
+            ...notification,
+            isRead: true,
+            readAt: new Date().toISOString(),
+          }))
         );
       }
     } catch (error) {
@@ -188,25 +141,23 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     fetchNotifications();
   };
 
-  // Fetch notifications when user changes or component mounts
   useEffect(() => {
     if (user?.id && isAuthenticated) {
       fetchNotifications();
     } else {
       setNotifications([]);
     }
-  }, [user?.id, isAuthenticated]);
+  }, [user?.id, isAuthenticated, fetchNotifications]);
 
-  // Auto-refresh notifications every 5 minutes
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const interval = setInterval(() => {
       fetchNotifications();
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, fetchNotifications]);
 
   const value = {
     notifications,

@@ -1,57 +1,65 @@
-import axios from "axios";
+import axios, { type AxiosError } from "axios";
 import { isMongoObjectId } from "./utils";
+import { API_BASE_URL, getApiBaseUrl } from "./config";
 
-// Use local development server in development, deployed in production
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? "http://localhost:3001/api" : "https://boxcricket-booking.onrender.com/api");
+export { API_BASE_URL, getApiBaseUrl };
 
-// Log API URL for debugging
 console.log("🔗 API Base URL:", API_BASE_URL);
 
-// Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000, // 60 seconds for better reliability on slow connections
+  timeout: 60000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("boxcric_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    if (import.meta.env.DEV) {
+      console.log(`[API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  },
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+export type ApiErrorBody = {
+  success?: boolean;
+  message?: string;
+  code?: string;
+  environment?: string;
+};
+
 api.interceptors.response.use(
   (response) => response.data,
-  (error) => {
-    if (error.code === 'ECONNABORTED') {
-      console.error('Request timed out. Please try again.');
-      return Promise.reject({ message: 'Request timed out. The server is taking too long to respond.' });
+  (error: AxiosError<ApiErrorBody>) => {
+    if (error.code === "ECONNABORTED") {
+      return Promise.reject({
+        message: "Request timed out. The server is taking too long to respond.",
+        code: "TIMEOUT",
+      });
     }
-    
+
     if (error.response?.status === 401) {
-      // Clear token and redirect to login
       localStorage.removeItem("boxcric_token");
       localStorage.removeItem("boxcric_user");
       window.location.href = "/login";
     }
-    
-    return Promise.reject(error.response?.data || error);
-  },
+
+    const body = error.response?.data;
+    return Promise.reject(
+      body && typeof body === "object"
+        ? body
+        : { message: error.message || "Network error", code: "NETWORK_ERROR" }
+    );
+  }
 );
 
-// Auth API
 export const authApi = {
   register: (data: {
     name: string;
@@ -70,7 +78,6 @@ export const authApi = {
   logout: () => api.post("/auth/logout"),
 };
 
-// Grounds API
 export const groundsApi = {
   getGrounds: (params?: {
     cityId?: string;
@@ -104,14 +111,11 @@ export const groundsApi = {
     api.get("/grounds/search/autocomplete", { params: { q } }),
 };
 
-// Bookings API
 export const bookingsApi = {
-  createBooking: async (data: any) => {
-    if (!isMongoObjectId(data.groundId)) {
+  createBooking: async (data: Record<string, unknown>) => {
+    if (!isMongoObjectId(data.groundId as string)) {
       throw new Error("This ground cannot be booked online.");
     }
-    
-    // The frontend now sends timeSlot in the correct format, so we don't need to construct it
     return api.post("/bookings", data);
   },
 
@@ -127,7 +131,7 @@ export const bookingsApi = {
 
   updateBookingStatus: (
     id: string,
-    data: { status: string; reason?: string },
+    data: { status: string; reason?: string }
   ) => api.patch(`/bookings/${id}/status`, data),
 
   addFeedback: (id: string, data: { rating: number; comment?: string }) =>
@@ -135,7 +139,6 @@ export const bookingsApi = {
 
   getStats: () => api.get("/bookings/stats/summary"),
 
-  // Temporary hold APIs
   createTemporaryHold: async (data: {
     groundId: string;
     bookingDate: string;
@@ -147,21 +150,20 @@ export const bookingsApi = {
     return api.post("/bookings/temp-hold", data);
   },
 
-  releaseTemporaryHold: (holdId: string) => 
+  releaseTemporaryHold: (holdId: string) =>
     api.delete(`/bookings/temp-hold/${holdId}`),
 
   getGroundAvailability: (groundId: string, date: string) =>
     api.get(`/bookings/ground/${groundId}/${date}`),
 };
 
-// Payments API
 export const paymentsApi = {
   createOrder: (data: { bookingId: string }) =>
     api.post("/payments/create-order", data),
 
   verifyPayment: (data: {
     order_id: string;
-    payment_session_id: string;
+    payment_session_id?: string;
     bookingId: string;
     mock?: boolean;
   }) => api.post("/payments/verify-payment", data),
@@ -169,8 +171,13 @@ export const paymentsApi = {
   paymentFailed: (data: {
     bookingId: string;
     order_id: string;
-    error: any;
+    error: unknown;
   }) => api.post("/payments/payment-failed", data),
+
+  getPaymentStatus: (bookingId: string, orderId?: string) =>
+    api.get(`/payments/status/${bookingId}`, {
+      params: orderId ? { order_id: orderId } : undefined,
+    }),
 
   initiateRefund: (data: { bookingId: string; reason?: string }) =>
     api.post("/payments/refund", data),
@@ -181,13 +188,12 @@ export const paymentsApi = {
   getPaymentDetails: (paymentId: string) => api.get(`/payments/${paymentId}`),
 };
 
-// Users API
 export const usersApi = {
   updateProfile: (data: {
     name?: string;
     phone?: string;
-    location?: any;
-    preferences?: any;
+    location?: Record<string, unknown>;
+    preferences?: Record<string, unknown>;
   }) => api.put("/users/profile", data),
 
   addToFavorites: (groundId: string) =>
@@ -214,7 +220,6 @@ export const usersApi = {
     api.delete("/users/account", { data }),
 };
 
-// Notifications API
 export const notificationsApi = {
   getNotifications: (params?: {
     page?: number;
@@ -225,16 +230,15 @@ export const notificationsApi = {
 
   getUnreadCount: () => api.get("/notifications/count"),
 
-  markAsRead: (notificationId: string) => 
+  markAsRead: (notificationId: string) =>
     api.patch(`/notifications/${notificationId}/read`),
 
   markAllAsRead: () => api.patch("/notifications/read-all"),
 
-  deleteNotification: (notificationId: string) => 
+  deleteNotification: (notificationId: string) =>
     api.delete(`/notifications/${notificationId}`),
 };
 
-// Admin Notifications API
 export const adminNotificationsApi = {
   sendBroadcast: (data: {
     title: string;
@@ -246,7 +250,6 @@ export const adminNotificationsApi = {
   getStats: () => api.get("/admin/notifications/stats"),
 };
 
-// Helper functions
 export const setAuthToken = (token: string) => {
   localStorage.setItem("boxcric_token", token);
 };
@@ -260,7 +263,7 @@ export const getAuthToken = () => {
   return localStorage.getItem("boxcric_token");
 };
 
-export const setUser = (user: any) => {
+export const setUser = (user: Record<string, unknown>) => {
   localStorage.setItem("boxcric_user", JSON.stringify(user));
 };
 

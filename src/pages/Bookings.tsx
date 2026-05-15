@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { bookingsApi } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
@@ -154,7 +155,7 @@ const Bookings = () => {
   const triggerManualCleanup = async () => {
     try {
       const token = localStorage.getItem('boxcric_token');
-      const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001/api' : 'https://box-junu.onrender.com/api');
+      const apiBase = API_BASE_URL;
       
       const response = await fetch(`${apiBase}/bookings/cleanup-expired`, {
         method: 'POST',

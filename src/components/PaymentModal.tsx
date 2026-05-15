@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { CreditCard, Shield, Clock, MapPin, Calendar, Users, Timer } from "lucide-react";
+import { CreditCard, Shield, Clock, Calendar, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,18 +10,20 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { paymentsApi, bookingsApi } from "@/lib/api";
+import { paymentsApi, bookingsApi, type ApiErrorBody } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { openCashfreeCheckout, type CashfreeMode } from "@/lib/cashfreeCheckout";
+import {
+  openCashfreeCheckout,
+  resolveCashfreeMode,
+} from "@/lib/cashfreeCheckout";
 
 interface Booking {
   _id?: string;
   id: string;
   bookingId: string;
-  groundId?: any;
-  ground?: any;
+  groundId?: { _id?: string; name?: string; price?: { perHour?: number } };
+  ground?: { name?: string; price?: { perHour?: number } };
   bookingDate: string;
   timeSlot: {
     startTime: string;
@@ -54,6 +56,35 @@ interface PaymentModalProps {
   onPaymentSuccess: (booking: Booking) => void;
 }
 
+type CreateOrderResponse = {
+  success?: boolean;
+  message?: string;
+  code?: string;
+  mode?: string;
+  mock?: boolean;
+  order?: {
+    id: string;
+    payment_session_id: string;
+    amount?: number;
+    mock?: boolean;
+    mode?: string;
+  };
+};
+
+function paymentErrorMessage(error: unknown): string {
+  const err = error as ApiErrorBody;
+  if (err.code === "CASHFREE_NOT_ACTIVATED") {
+    return "Cashfree live account is not activated. On Render, set CASHFREE_ENVIRONMENT=SANDBOX with sandbox API keys, or complete KYC for live payments.";
+  }
+  if (err.code === "CASHFREE_ENV_MISMATCH") {
+    return err.message || "Cashfree environment does not match your API keys.";
+  }
+  if (err.code === "CASHFREE_AUTH_FAILED") {
+    return "Cashfree credentials are invalid for the selected environment (sandbox vs production).";
+  }
+  return err.message || "Payment failed to initialize";
+}
+
 const PaymentModal = ({
   isOpen,
   onClose,
@@ -74,15 +105,17 @@ const PaymentModal = ({
       if (!groundId) return;
 
       try {
-        const holdResponse = await bookingsApi.createTemporaryHold({
+        const holdResponse = (await bookingsApi.createTemporaryHold({
           groundId: String(groundId),
           bookingDate: booking.bookingDate,
           timeSlot: `${booking.timeSlot.startTime}-${booking.timeSlot.endTime}`,
-        });
+        })) as { success?: boolean; holdId?: string; expiresAt?: string };
 
-        if ((holdResponse as { success?: boolean })?.success) {
-          setTemporaryHoldId((holdResponse as { holdId: string }).holdId);
-          setHoldExpiresAt(new Date((holdResponse as { expiresAt: string }).expiresAt));
+        if (holdResponse?.success && holdResponse.holdId) {
+          setTemporaryHoldId(holdResponse.holdId);
+          if (holdResponse.expiresAt) {
+            setHoldExpiresAt(new Date(holdResponse.expiresAt));
+          }
         }
       } catch (error) {
         console.warn("Temporary hold skipped:", error);
@@ -93,7 +126,7 @@ const PaymentModal = ({
   }, [isOpen, booking, temporaryHoldId]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (holdExpiresAt) {
       interval = setInterval(() => {
         const timeLeft = Math.max(0, holdExpiresAt.getTime() - Date.now());
@@ -123,9 +156,11 @@ const PaymentModal = ({
     if (!booking) return null;
 
     const ground =
-      booking.groundId && typeof booking.groundId === "object" && booking.groundId.name
+      booking.groundId &&
+      typeof booking.groundId === "object" &&
+      booking.groundId.name
         ? booking.groundId
-        : booking.ground || { name: "Cricket Ground", location: { address: "" } };
+        : booking.ground || { name: "Cricket Ground" };
 
     let baseAmount = booking.pricing?.baseAmount ?? 0;
     const perHour = ground?.price?.perHour || 0;
@@ -169,35 +204,23 @@ const PaymentModal = ({
       setIsProcessing(true);
       console.log("💳 Creating payment order for booking:", bookingId);
 
-      const orderResponse = (await paymentsApi.createOrder({ bookingId })) as {
-        success?: boolean;
-        message?: string;
-        order?: {
-          id: string;
-          payment_session_id: string;
-          amount?: number;
-          mock?: boolean;
-          mode?: string;
-        };
-        mode?: string;
-        mock?: boolean;
-      };
+      const orderResponse = (await paymentsApi.createOrder({
+        bookingId,
+      })) as CreateOrderResponse;
 
       if (!orderResponse?.success || !orderResponse.order) {
-        throw new Error(orderResponse?.message || "Failed to create payment order");
+        throw orderResponse;
       }
 
       const { order } = orderResponse;
-      const gatewayMode: CashfreeMode =
-        orderResponse.mode === "sandbox" || order.mode === "sandbox"
-          ? "sandbox"
-          : "production";
+      const gatewayMode = resolveCashfreeMode(
+        orderResponse.mode || order.mode
+      );
 
       const isMockPayment =
         orderResponse.mock === true ||
         order.mock === true ||
         order.mode === "mock" ||
-        order.mode === "mock_fallback" ||
         !order.payment_session_id?.trim() ||
         order.payment_session_id.startsWith("mock_");
 
@@ -226,22 +249,13 @@ const PaymentModal = ({
 
       console.log("💳 Launching Cashfree checkout, mode:", gatewayMode);
       await openCashfreeCheckout(order.payment_session_id, gatewayMode);
-      // User is redirected to Cashfree; callback page handles verification
+      // Modal checkout: user completes payment in popup; callback URL handles confirmation
     } catch (error: unknown) {
       console.error("Payment initiation error:", error);
-      const message =
-        error instanceof Error ? error.message : "Payment failed to initialize";
-      toast.error(message);
+      toast.error(paymentErrorMessage(error));
       setIsProcessing(false);
     }
-  }, [
-    booking,
-    user,
-    bookingData,
-    navigate,
-    onClose,
-    temporaryHoldId,
-  ]);
+  }, [booking, user, bookingData, navigate, onClose, temporaryHoldId]);
 
   if (!booking || !bookingData) return null;
 

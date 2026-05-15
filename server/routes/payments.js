@@ -12,9 +12,10 @@ import {
 } from "../lib/paymentUrls.js";
 import { getCashfreeConfig, logCashfreeConfig } from "../lib/cashfreeConfig.js";
 import {
-  getCashfreeClient,
   createCashfreeOrder,
   fetchCashfreeOrder,
+  isCashfreeActivationError,
+  isCashfreeAuthError,
 } from "../services/cashfreeService.js";
 
 logCashfreeConfig();
@@ -312,24 +313,37 @@ router.post("/create-order", authMiddleware, async (req, res) => {
       const errBody = sdkError.response?.data || sdkError;
       const errorMessage =
         errBody?.message || sdkError.message || "Failed to create Cashfree order";
+      const httpStatus = sdkError.response?.status;
       console.error("❌ Cashfree SDK error:", errBody);
 
-      if (String(errorMessage).includes("transactions are not enabled")) {
-        return res.status(503).json({
+      if (sdkError.code === "CASHFREE_ENV_MISMATCH") {
+        return res.status(400).json({
           success: false,
-          message:
-            "Cashfree account is not activated for live payments. Complete KYC in Cashfree dashboard.",
+          code: "CASHFREE_ENV_MISMATCH",
+          message: sdkError.message,
+        });
+      }
+
+      if (isCashfreeActivationError(errorMessage)) {
+        const cfg = cashfreeCfg();
+        return res.status(400).json({
+          success: false,
           code: "CASHFREE_NOT_ACTIVATED",
-        });
-      }
-      if (sdkError.response?.status === 401 || sdkError.response?.status === 403) {
-        return res.status(502).json({
-          success: false,
           message:
-            "Cashfree authentication failed. Verify CASHFREE_APP_ID and CASHFREE_SECRET_KEY match the same environment (sandbox vs production).",
-          code: "CASHFREE_AUTH_FAILED",
+            "Cashfree account is not activated for transactions. Complete KYC or use Sandbox credentials with CASHFREE_ENVIRONMENT=SANDBOX.",
+          environment: cfg.environment,
         });
       }
+
+      if (isCashfreeAuthError(httpStatus, errorMessage)) {
+        return res.status(400).json({
+          success: false,
+          code: "CASHFREE_AUTH_FAILED",
+          message:
+            "Cashfree authentication failed. Verify CASHFREE_APP_ID and CASHFREE_SECRET_KEY match CASHFREE_ENVIRONMENT (SANDBOX vs PRODUCTION).",
+        });
+      }
+
       throw new Error(errorMessage);
     }
 

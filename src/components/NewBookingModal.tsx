@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import PaymentModal from "@/components/PaymentModal";
 import { isMongoObjectId } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/config";
 
 interface Ground {
   _id: string;
@@ -289,7 +290,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
     }
     
     try {
-      const API = import.meta.env.VITE_API_URL || "https://box-junu.onrender.com/api";
+      const API = API_BASE_URL;
       const healthResponse = await fetch(`${API}/health`);
       if (!healthResponse.ok) throw new Error('Server not responding');
     } catch {

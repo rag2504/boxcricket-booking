@@ -26,7 +26,7 @@ interface Booking {
   status: string;
 }
 
-const API = import.meta.env.VITE_API_URL || "https://box-junu.onrender.com/api";
+import { API_BASE_URL as API } from "@/lib/config";
 
 function getToken() {
   return localStorage.getItem("token");

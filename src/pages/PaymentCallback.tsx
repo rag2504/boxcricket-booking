@@ -1,20 +1,21 @@
-// Use the same API base URL logic as the rest of the app
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV
-    ? "http://localhost:3001/api"
-    : "https://boxcricket-booking.onrender.com/api");
-
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, XCircle, Clock, AlertTriangle, Home, Receipt, MapPin } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertTriangle,
+  Home,
+  Receipt,
+  MapPin,
+} from "lucide-react";
+import { paymentsApi, bookingsApi } from "@/lib/api";
 
 function getQueryParam(search: string, key: string) {
-  const params = new URLSearchParams(search);
-  return params.get(key);
+  return new URLSearchParams(search).get(key);
 }
 
 interface PaymentStatus {
@@ -22,7 +23,7 @@ interface PaymentStatus {
   bookingId?: string;
   orderId?: string;
   amount?: number;
-  bookingDetails?: any;
+  bookingDetails?: Record<string, unknown>;
 }
 
 const PaymentCallback = () => {
@@ -36,15 +37,23 @@ const PaymentCallback = () => {
   useEffect(() => {
     const fetchPaymentStatus = async () => {
       try {
-        // Get parameters from URL
         const bookingId = getQueryParam(location.search, "booking_id");
         const orderId = getQueryParam(location.search, "order_id");
         const paymentSessionId = getQueryParam(location.search, "payment_session_id");
-        const txStatus = getQueryParam(location.search, "txStatus") || getQueryParam(location.hash, "txStatus");
+        const txStatus =
+          getQueryParam(location.search, "txStatus") ||
+          getQueryParam(location.hash, "txStatus");
         const orderStatus = getQueryParam(location.search, "order_status");
         const isMock = getQueryParam(location.search, "mock") === "true";
 
-        console.log("Payment callback params:", { bookingId, orderId, paymentSessionId, txStatus, orderStatus, isMock });
+        console.log("💳 Payment callback params:", {
+          bookingId,
+          orderId,
+          paymentSessionId,
+          txStatus,
+          orderStatus,
+          isMock,
+        });
 
         if (!bookingId) {
           setError("No booking ID found in callback URL.");
@@ -52,189 +61,105 @@ const PaymentCallback = () => {
           return;
         }
 
-        // Handle mock payments (development mode)
-        if (isMock || orderId?.startsWith('mock_')) {
-          console.log("🧪 Development mode: Handling mock payment callback");
-          
-          try {
-            const token = localStorage.getItem("boxcric_token");
-            const verifyResponse = await fetch(`${API_BASE_URL}/payments/verify-payment`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                order_id: orderId || `mock_order_${Date.now()}`,
-                payment_session_id: paymentSessionId || `mock_session_${Date.now()}`,
-                bookingId: bookingId,
-                mock: true
-              })
+        const verifyWithBackend = async (mock = false) => {
+          const verifyData = (await paymentsApi.verifyPayment({
+            order_id: orderId || `order_${Date.now()}`,
+            payment_session_id: paymentSessionId || undefined,
+            bookingId,
+            mock,
+          })) as {
+            success?: boolean;
+            message?: string;
+            status?: string;
+            booking?: {
+              pricing?: { totalAmount?: number };
+              [key: string]: unknown;
+            };
+          };
+
+          console.log("💳 Payment verification response:", verifyData);
+
+          if (verifyData.success) {
+            setPaymentStatus({
+              status: "SUCCESS",
+              bookingId,
+              orderId: orderId || undefined,
+              amount: verifyData.booking?.pricing?.totalAmount,
+              bookingDetails: verifyData.booking,
             });
+            return true;
+          }
 
-            const verifyData = await verifyResponse.json();
-            console.log("Mock payment verification response:", verifyData);
+          if (verifyData.status === "pending") {
+            setPaymentStatus({ status: "PENDING", bookingId, orderId: orderId || undefined });
+            return true;
+          }
 
-            if (verifyData.success) {
-              setPaymentStatus({
-                status: "SUCCESS",
-                bookingId,
-                orderId: orderId || `mock_order_${Date.now()}`,
-                amount: verifyData.booking?.pricing?.totalAmount,
-                bookingDetails: verifyData.booking
-              });
-              setLoading(false);
-              return;
-            } else {
-              console.error("Mock payment verification failed:", verifyData.message);
-              setPaymentStatus({
-                status: "FAILED",
-                bookingId,
-                orderId
-              });
+          return false;
+        };
+
+        if (isMock || orderId?.startsWith("mock_")) {
+          await verifyWithBackend(true);
+          setLoading(false);
+          return;
+        }
+
+        if (orderStatus) {
+          const mapped = mapCashfreeStatus(orderStatus);
+          if (mapped === "SUCCESS" && orderId) {
+            const ok = await verifyWithBackend(false);
+            if (ok) {
               setLoading(false);
               return;
             }
-          } catch (verifyError) {
-            console.error("Mock payment verification error:", verifyError);
-            setPaymentStatus({
-              status: "FAILED",
-              bookingId,
-              orderId
-            });
+          }
+          setPaymentStatus({ status: mapped, bookingId, orderId: orderId || undefined });
+          setLoading(false);
+          return;
+        }
+
+        if (orderId) {
+          const ok = await verifyWithBackend(false);
+          if (ok) {
             setLoading(false);
             return;
           }
         }
 
-        // Handle order_status parameter (for mock payments with status)
-        if (orderStatus) {
-          console.log("Using order_status from URL:", orderStatus);
-          const status = mapCashfreeStatus(orderStatus);
-          
-          if (status === "SUCCESS") {
-            // Verify the payment for successful mock payments
-            try {
-              const token = localStorage.getItem("boxcric_token");
-              const verifyResponse = await fetch(`${API_BASE_URL}/payments/verify-payment`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                  order_id: orderId || `mock_order_${Date.now()}`,
-                  payment_session_id: paymentSessionId || `mock_session_${Date.now()}`,
-                  bookingId: bookingId,
-                  mock: true
-                })
-              });
-
-              const verifyData = await verifyResponse.json();
-              console.log("Payment verification response:", verifyData);
-
-              if (verifyData.success) {
-                setPaymentStatus({
-                  status: "SUCCESS",
-                  bookingId,
-                  orderId,
-                  amount: verifyData.booking?.pricing?.totalAmount,
-                  bookingDetails: verifyData.booking
-                });
-                setLoading(false);
-                return;
-              }
-            } catch (verifyError) {
-              console.error("Payment verification error:", verifyError);
-            }
-          }
-          
-          setPaymentStatus({
-            status,
-            bookingId,
-            orderId
-          });
-          setLoading(false);
-          return;
-        }
-
-        // If we have payment success parameters, verify the payment first
-        if (orderId && paymentSessionId && txStatus && txStatus.toUpperCase() === "SUCCESS") {
-          console.log("Payment success detected, verifying payment...");
-
-          try {
-            const token = localStorage.getItem("boxcric_token");
-            const verifyResponse = await fetch(`${API_BASE_URL}/payments/verify-payment`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                order_id: orderId,
-                payment_session_id: paymentSessionId,
-                bookingId: bookingId
-              })
-            });
-
-            const verifyData = await verifyResponse.json();
-            console.log("Payment verification response:", verifyData);
-
-            if (verifyData.success) {
-              // Payment verified successfully, booking should be confirmed
-              setPaymentStatus({
-                status: "SUCCESS",
-                bookingId,
-                orderId,
-                amount: verifyData.booking?.pricing?.totalAmount,
-                bookingDetails: verifyData.booking
-              });
+        if (txStatus) {
+          const status = mapCashfreeStatus(txStatus);
+          if (status === "SUCCESS" && orderId) {
+            const ok = await verifyWithBackend(false);
+            if (ok) {
               setLoading(false);
               return;
-            } else {
-              console.error("Payment verification failed:", verifyData.message);
             }
-          } catch (verifyError) {
-            console.error("Payment verification error:", verifyError);
           }
-        }
-
-        // First, try to get status from URL parameters (Cashfree callback)
-        if (txStatus) {
-          console.log("Using txStatus from URL:", txStatus);
-          const status = mapCashfreeStatus(txStatus);
-          setPaymentStatus({
-            status,
-            bookingId,
-            orderId
-          });
+          setPaymentStatus({ status, bookingId, orderId: orderId || undefined });
           setLoading(false);
           return;
         }
 
-        // If no txStatus, fetch from backend
-        console.log("Fetching booking status from backend...");
-        const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}`);
-        const data = await response.json();
+        const bookingRes = (await bookingsApi.getBooking(bookingId)) as {
+          success?: boolean;
+          booking?: {
+            status?: string;
+            payment?: { status?: string; cashfreeOrderId?: string };
+            pricing?: { totalAmount?: number };
+            [key: string]: unknown;
+          };
+        };
 
-        if (data.success && data.booking) {
-          const booking = data.booking;
-          const paymentStatus = booking.payment?.status || "pending";
+        if (bookingRes.success && bookingRes.booking) {
+          const booking = bookingRes.booking;
+          const payStatus = booking.payment?.status || "pending";
           const bookingStatus = booking.status;
 
-          console.log("PaymentCallback: Backend response:", { paymentStatus, bookingStatus, booking });
-          console.log("PaymentCallback: booking.groundId type:", typeof booking?.groundId);
-          console.log("PaymentCallback: booking.groundId value:", booking?.groundId);
-          console.log("PaymentCallback: booking.ground value:", booking?.ground);
-
-          // Determine final status based on both payment and booking status
           let finalStatus = "PENDING";
-          if (paymentStatus === "completed" && bookingStatus === "confirmed") {
+          if (payStatus === "completed" && bookingStatus === "confirmed") {
             finalStatus = "SUCCESS";
-          } else if (paymentStatus === "failed" || bookingStatus === "cancelled") {
+          } else if (payStatus === "failed" || bookingStatus === "cancelled") {
             finalStatus = "FAILED";
-          } else if (paymentStatus === "pending" && bookingStatus === "pending") {
-            finalStatus = "PENDING";
           }
 
           setPaymentStatus({
@@ -242,27 +167,32 @@ const PaymentCallback = () => {
             bookingId,
             orderId: booking.payment?.cashfreeOrderId,
             amount: booking.pricing?.totalAmount,
-            bookingDetails: booking
+            bookingDetails: booking,
+          });
+          setLoading(false);
+          return;
+        }
+
+        const statusRes = (await paymentsApi.getPaymentStatus(
+          bookingId,
+          orderId || undefined
+        )) as {
+          success?: boolean;
+          status?: string;
+          cashfreeOrderId?: string;
+        };
+
+        if (statusRes.success && statusRes.status) {
+          setPaymentStatus({
+            status: mapCashfreeStatus(statusRes.status),
+            bookingId,
+            orderId: statusRes.cashfreeOrderId || orderId || undefined,
           });
         } else {
-          // Fallback: try to get status from Cashfree directly
-          console.log("Trying Cashfree status endpoint...");
-          const cashfreeResponse = await fetch(`${API_BASE_URL}/payments/status/${bookingId}`);
-          const cashfreeData = await cashfreeResponse.json();
-
-          if (cashfreeData.success && cashfreeData.status) {
-            const status = mapCashfreeStatus(cashfreeData.status);
-            setPaymentStatus({
-              status,
-              bookingId,
-              orderId: cashfreeData.cashfreeOrderId
-            });
-          } else {
-            setError("Could not fetch payment status. Please check your bookings.");
-          }
+          setError("Could not fetch payment status. Please check your bookings.");
         }
-      } catch (error) {
-        console.error("Payment status fetch error:", error);
+      } catch (err) {
+        console.error("Payment status fetch error:", err);
         setError("Failed to fetch payment status. Please check your bookings.");
       } finally {
         setLoading(false);
@@ -272,85 +202,56 @@ const PaymentCallback = () => {
     fetchPaymentStatus();
   }, [location]);
 
-  // Helper function to map Cashfree status to our status
   const mapCashfreeStatus = (status: string): string => {
     const statusUpper = status.toUpperCase();
-    if (["SUCCESS", "PAID", "COMPLETED"].includes(statusUpper)) {
-      return "SUCCESS";
-    } else if (["FAILED", "CANCELLED", "EXPIRED", "TERMINATED", "USER_DROPPED"].includes(statusUpper)) {
+    if (["SUCCESS", "PAID", "COMPLETED"].includes(statusUpper)) return "SUCCESS";
+    if (
+      ["FAILED", "CANCELLED", "EXPIRED", "TERMINATED", "USER_DROPPED"].includes(
+        statusUpper
+      )
+    ) {
       return "FAILED";
-    } else if (["PENDING"].includes(statusUpper)) {
-      return "PENDING";
-    } else if (["ACTIVE"].includes(statusUpper)) {
-      // ACTIVE means payment session is still active but user might have cancelled
-      // Check if we have URL parameters indicating cancellation
-      const urlParams = new URLSearchParams(window.location.search);
-      const txStatus = urlParams.get('txStatus');
-      if (txStatus && ["CANCELLED", "FAILED", "USER_DROPPED"].includes(txStatus.toUpperCase())) {
-        return "FAILED";
-      }
-      return "PENDING";
     }
+    if (["PENDING", "ACTIVE"].includes(statusUpper)) return "PENDING";
     return statusUpper;
   };
 
-  // Helper functions to extract ground information
-  const getGroundName = (ground: any): string => {
-    if (!ground) return "Ground";
-    
-    // Handle different ground data structures
-    if (typeof ground === "string") {
-      return "Ground"; // Just the ID was provided
+  const getGroundName = (ground: unknown): string => {
+    if (!ground || typeof ground === "string") return "Ground";
+    if (typeof ground === "object" && ground !== null && "name" in ground) {
+      return String((ground as { name?: string }).name || "Ground");
     }
-    
-    if (typeof ground === "object") {
-      return ground.name || "Ground";
-    }
-    
     return "Ground";
   };
-  
-  const getGroundImage = (ground: any): string => {
-    if (!ground) return "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
-    
-    // Handle different ground data structures
-    if (typeof ground === "string") {
-      return "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
-    }
-    
-    if (typeof ground === "object") {
-      // Check if images array exists and has items
-      if (ground.images && Array.isArray(ground.images) && ground.images.length > 0) {
-        const imgItem = ground.images[0];
-        if (typeof imgItem === "string") {
-          return imgItem.startsWith('http') ? imgItem : "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
-        } else if (imgItem && typeof imgItem === "object" && "url" in imgItem) {
-          return imgItem.url && imgItem.url.startsWith('http') ? imgItem.url : "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
+
+  const getGroundImage = (ground: unknown): string => {
+    const fallback =
+      "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
+    if (!ground || typeof ground === "string") return fallback;
+    if (typeof ground === "object" && ground !== null && "images" in ground) {
+      const images = (ground as { images?: unknown[] }).images;
+      if (Array.isArray(images) && images.length > 0) {
+        const img = images[0];
+        if (typeof img === "string" && img.startsWith("http")) return img;
+        if (typeof img === "object" && img !== null && "url" in img) {
+          const url = (img as { url?: string }).url;
+          if (url?.startsWith("http")) return url;
         }
       }
     }
-    
-    return "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
+    return fallback;
   };
-  
-  const getGroundAddress = (ground: any): string => {
-    if (!ground) return "No address available";
-    
-    // Handle different ground data structures
-    if (typeof ground === "string") {
-      return "No address available";
+
+  const getGroundAddress = (ground: unknown): string => {
+    if (!ground || typeof ground === "string") return "No address available";
+    if (typeof ground === "object" && ground !== null && "location" in ground) {
+      const loc = (ground as { location?: { address?: string } | string }).location;
+      if (typeof loc === "object" && loc?.address) return loc.address;
+      if (typeof loc === "string") return loc;
     }
-    
-    if (typeof ground === "object") {
-      return ground.location?.address ||
-        (ground.location ? ground.location : "") ||
-        "No address available";
-    }
-    
     return "No address available";
   };
 
-  // Countdown and navigation logic
   useEffect(() => {
     if (!paymentStatus) return;
 
@@ -362,16 +263,11 @@ const PaymentCallback = () => {
       toast.error("Payment failed or was cancelled.");
     }
 
-    // Start countdown for navigation
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          if (status === "SUCCESS") {
-            navigate("/profile/bookings");
-          } else {
-            navigate("/");
-          }
+          navigate(status === "SUCCESS" ? "/profile/bookings" : "/");
           return 0;
         }
         return prev - 1;
@@ -400,25 +296,25 @@ const PaymentCallback = () => {
         return {
           title: "Payment Successful!",
           description: "Your booking has been confirmed successfully.",
-          color: "text-green-600"
+          color: "text-green-600",
         };
       case "FAILED":
         return {
           title: "Payment Failed",
           description: "Your payment could not be processed or was cancelled.",
-          color: "text-red-600"
+          color: "text-red-600",
         };
       case "PENDING":
         return {
           title: "Payment Pending",
           description: "Your payment is still being processed. Please wait.",
-          color: "text-yellow-600"
+          color: "text-yellow-600",
         };
       default:
         return {
           title: "Unknown Status",
           description: "We're checking your payment status. Please wait.",
-          color: "text-orange-600"
+          color: "text-orange-600",
         };
     }
   };
@@ -453,9 +349,7 @@ const PaymentCallback = () => {
                 <AlertTriangle className="w-16 h-16 text-red-500" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-red-600 mb-2">
-                  Error
-                </h3>
+                <h3 className="text-lg font-semibold text-red-600 mb-2">Error</h3>
                 <p className="text-gray-600 mb-4">{error}</p>
                 <div className="space-y-2">
                   <Button
@@ -483,7 +377,9 @@ const PaymentCallback = () => {
               </div>
 
               <div>
-                <h3 className={`text-xl font-semibold mb-2 ${getStatusMessage(paymentStatus.status).color}`}>
+                <h3
+                  className={`text-xl font-semibold mb-2 ${getStatusMessage(paymentStatus.status).color}`}
+                >
                   {getStatusMessage(paymentStatus.status).title}
                 </h3>
                 <p className="text-gray-600 mb-4">
@@ -491,10 +387,8 @@ const PaymentCallback = () => {
                 </p>
               </div>
 
-              {/* Booking Details */}
               {paymentStatus.bookingId && (
                 <div className="space-y-4">
-                  {/* Ground Information */}
                   {paymentStatus.bookingDetails?.groundId && (
                     <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
                       <div className="flex items-start space-x-3">
@@ -503,29 +397,30 @@ const PaymentCallback = () => {
                             src={getGroundImage(paymentStatus.bookingDetails.groundId)}
                             alt={getGroundName(paymentStatus.bookingDetails.groundId)}
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.src = "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
-                            }}
                           />
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 text-left">
                           <h3 className="text-lg font-semibold text-gray-900 mb-1">
                             {getGroundName(paymentStatus.bookingDetails.groundId)}
                           </h3>
                           <div className="flex items-center text-sm text-gray-600">
                             <MapPin className="w-3 h-3 mr-1" />
-                            <span className="truncate">{getGroundAddress(paymentStatus.bookingDetails.groundId)}</span>
+                            <span className="truncate">
+                              {getGroundAddress(paymentStatus.bookingDetails.groundId)}
+                            </span>
                           </div>
                         </div>
                       </div>
                     </div>
                   )}
-                  
-                  {/* Payment Details */}
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-left">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Booking ID:</span>
-                      <span className="font-medium">{paymentStatus.bookingDetails?.bookingId || paymentStatus.bookingId}</span>
+                      <span className="font-medium">
+                        {(paymentStatus.bookingDetails as { bookingId?: string })
+                          ?.bookingId || paymentStatus.bookingId}
+                      </span>
                     </div>
                     {paymentStatus.orderId && (
                       <div className="flex justify-between text-sm">
@@ -533,7 +428,7 @@ const PaymentCallback = () => {
                         <span className="font-medium">{paymentStatus.orderId}</span>
                       </div>
                     )}
-                    {paymentStatus.amount && (
+                    {paymentStatus.amount != null && (
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Amount:</span>
                         <span className="font-medium">₹{paymentStatus.amount}</span>
@@ -543,7 +438,6 @@ const PaymentCallback = () => {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="space-y-2">
                 {paymentStatus.status === "SUCCESS" ? (
                   <>
@@ -563,40 +457,19 @@ const PaymentCallback = () => {
                     <p className="text-sm text-gray-600">
                       Redirecting to home in {countdown} seconds...
                     </p>
-                    <Button
-                      onClick={() => navigate("/")}
-                      className="w-full"
-                    >
+                    <Button onClick={() => navigate("/")} className="w-full">
                       <Home className="w-4 h-4 mr-2" />
                       Try Booking Again
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => navigate("/profile/bookings")}
-                      className="w-full"
-                    >
-                      <Receipt className="w-4 h-4 mr-2" />
-                      Check My Bookings
-                    </Button>
                   </>
                 ) : (
-                  <>
-                    <Button
-                      onClick={() => navigate("/profile/bookings")}
-                      className="w-full"
-                    >
-                      <Receipt className="w-4 h-4 mr-2" />
-                      Check My Bookings
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => navigate("/")}
-                      className="w-full"
-                    >
-                      <Home className="w-4 h-4 mr-2" />
-                      Go Home
-                    </Button>
-                  </>
+                  <Button
+                    onClick={() => navigate("/profile/bookings")}
+                    className="w-full"
+                  >
+                    <Receipt className="w-4 h-4 mr-2" />
+                    Check My Bookings
+                  </Button>
                 )}
               </div>
             </>

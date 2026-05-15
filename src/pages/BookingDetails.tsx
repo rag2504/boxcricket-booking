@@ -21,6 +21,7 @@ import { Separator } from "@/components/ui/separator";
 import Navbar from "@/components/Navbar";
 import PaymentModal from "@/components/PaymentModal";
 import { bookingsApi } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -216,11 +217,7 @@ const BookingDetails = () => {
       }
 
       // Always use API base URL so production doesn't call the frontend domain
-      const apiBase =
-        import.meta.env.VITE_API_URL ||
-        (import.meta.env.DEV
-          ? "http://localhost:3001/api"
-          : "https://boxcricket-booking.onrender.com/api");
+      const apiBase = API_BASE_URL;
 
       // Detect mobile browsers
       const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);

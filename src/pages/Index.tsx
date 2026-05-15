@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { isMongoObjectId } from "@/lib/utils";
 import { bookingsApi } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 
 // Demo data for testimonials
 const testimonials = [
@@ -179,11 +180,10 @@ const Index = () => {
 
   // Test API connection on mount
   useEffect(() => {
-    const API = import.meta.env.VITE_API_URL || "https://box-junu.onrender.com/api";
     const testAPI = async () => {
       try {
         console.log("🧪 Testing API connection...");
-        const response = await fetch(`${API}/test`);
+        const response = await fetch(`${API_BASE_URL}/test`);
         const data = await response.json();
         console.log("✅ API Test Result:", data);
       } catch (error) {

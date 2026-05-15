@@ -2,17 +2,20 @@ import { Cashfree, CFEnvironment } from "cashfree-pg";
 import { getCashfreeConfig } from "../lib/cashfreeConfig.js";
 
 let client = null;
+let clientEnv = null;
 
 export function getCashfreeClient() {
   const cfg = getCashfreeConfig();
   if (cfg.useMock) return null;
 
-  if (!client) {
-    client = new Cashfree(
-      cfg.isSandbox ? CFEnvironment.SANDBOX : CFEnvironment.PRODUCTION,
-      cfg.appId,
-      cfg.secretKey
+  const sdkEnv = cfg.isSandbox ? CFEnvironment.SANDBOX : CFEnvironment.PRODUCTION;
+
+  if (!client || clientEnv !== sdkEnv) {
+    console.log(
+      `💳 Initializing Cashfree SDK (${cfg.isSandbox ? "SANDBOX" : "PRODUCTION"})`
     );
+    client = new Cashfree(sdkEnv, cfg.appId, cfg.secretKey);
+    clientEnv = sdkEnv;
   }
   return client;
 }
@@ -43,9 +46,19 @@ export async function createCashfreeOrder({
   returnUrl,
   notifyUrl,
 }) {
+  const cfg = getCashfreeConfig();
   const cf = getCashfreeClient();
   if (!cf) {
     throw new Error("Cashfree client not initialized");
+  }
+
+  if (cfg.envKeyMismatch) {
+    throw Object.assign(
+      new Error(
+        "CASHFREE_ENVIRONMENT does not match your API keys. Use SANDBOX with test keys or PRODUCTION with live keys."
+      ),
+      { code: "CASHFREE_ENV_MISMATCH" }
+    );
   }
 
   const orderAmount = Number(Number(amount).toFixed(2));
@@ -71,13 +84,21 @@ export async function createCashfreeOrder({
   };
 
   console.log("💳 Cashfree PGCreateOrder:", {
+    environment: cfg.environment,
     order_id: orderData.order_id,
     order_amount: orderData.order_amount,
     return_url: returnUrl,
+    notify_url: notifyUrl,
   });
 
   const response = await cf.PGCreateOrder(orderData);
   const data = response?.data;
+
+  console.log("💳 Cashfree PGCreateOrder response:", {
+    order_id: data?.order_id,
+    order_status: data?.order_status,
+    has_payment_session_id: Boolean(data?.payment_session_id),
+  });
 
   if (!data?.order_id || !data?.payment_session_id) {
     console.error("❌ Invalid Cashfree create order response:", data);
@@ -88,7 +109,7 @@ export async function createCashfreeOrder({
 
   console.log("✅ Cashfree order created:", {
     order_id: data.order_id,
-    payment_session_id: data.payment_session_id?.slice(0, 20) + "...",
+    payment_session_id: `${data.payment_session_id.slice(0, 24)}...`,
     order_status: data.order_status,
   });
 
@@ -98,6 +119,29 @@ export async function createCashfreeOrder({
 export async function fetchCashfreeOrder(orderId) {
   const cf = getCashfreeClient();
   if (!cf) throw new Error("Cashfree client not initialized");
+  console.log("💳 Cashfree PGFetchOrder:", orderId);
   const response = await cf.PGFetchOrder(orderId);
-  return response?.data;
+  const data = response?.data;
+  console.log("💳 Cashfree order status:", {
+    order_id: data?.order_id,
+    order_status: data?.order_status,
+  });
+  return data;
+}
+
+/** Detect Cashfree account / activation errors from SDK or API */
+export function isCashfreeActivationError(message) {
+  const m = String(message || "").toLowerCase();
+  return (
+    m.includes("transactions are not enabled") ||
+    m.includes("not activated") ||
+    m.includes("complete kyc") ||
+    m.includes("account is not activated")
+  );
+}
+
+export function isCashfreeAuthError(status, message) {
+  if (status === 401 || status === 403) return true;
+  const m = String(message || "").toLowerCase();
+  return m.includes("authentication") || m.includes("invalid app id");
 }

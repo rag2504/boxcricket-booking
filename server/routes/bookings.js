@@ -944,22 +944,16 @@ router.get("/:id", authMiddleware, async (req, res) => {
     // Auto-fix: Check if payment is completed but booking is still pending
     if (booking.status === 'pending' && booking.payment?.cashfreeOrderId) {
       try {
-        const { Cashfree } = await import('cashfree-pg');
-        const cashfree = new Cashfree({
-          env: process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'SANDBOX',
-          appId: process.env.CASHFREE_APP_ID,
-          secretKey: process.env.CASHFREE_SECRET_KEY
-        });
-
-        const response = await cashfree.PGFetchOrder(booking.payment.cashfreeOrderId);
-        const order_status = response.data.order_status;
+        const { fetchCashfreeOrder } = await import('../services/cashfreeService.js');
+        const paymentDetails = await fetchCashfreeOrder(booking.payment.cashfreeOrderId);
+        const order_status = paymentDetails.order_status;
 
         if (order_status === 'PAID') {
           console.log(`🔧 Auto-fixing booking ${booking.bookingId}: Payment is PAID but booking is pending`);
 
           booking.payment.status = "completed";
           booking.payment.paidAt = new Date();
-          booking.payment.paymentDetails = response.data;
+          booking.payment.paymentDetails = paymentDetails;
           booking.status = "confirmed";
           booking.confirmation = {
             confirmedAt: new Date(),

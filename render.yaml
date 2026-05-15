@@ -21,8 +21,12 @@ services:
         sync: false
       - key: CASHFREE_SECRET_KEY
         sync: false
-      - key: CASHFREE_API_URL
-        value: https://api.cashfree.com/pg
+      - key: CASHFREE_ENVIRONMENT
+        value: SANDBOX
+      - key: BACKEND_URL
+        value: https://boxcricket-booking.onrender.com
+      - key: FRONTEND_URL
+        value: https://boxcricket-booking.vercel.app
       # Render free tier blocks SMTP (ports 587/465). Use Resend HTTP API instead.
       - key: RESEND_API_KEY
         sync: false
@@ -32,8 +36,6 @@ services:
         value: BoxCric <assignurassignment@gmail.com>
       - key: JWT_SECRET
         sync: false
-      - key: FRONTEND_URL
-        value: https://boxcric.netlify.app
 
 databases:
   - name: boxcric-db

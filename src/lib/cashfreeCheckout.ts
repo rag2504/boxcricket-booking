@@ -28,7 +28,6 @@ function loadCashfreeScript(): Promise<void> {
   });
 }
 
-/** Wait for Cashfree PG v3 SDK */
 export function waitForCashfree(maxWaitMs = 20000): Promise<void> {
   return new Promise((resolve, reject) => {
     const tryReady = () => typeof window.Cashfree === "function";
@@ -61,9 +60,19 @@ export function waitForCashfree(maxWaitMs = 20000): Promise<void> {
 
 export type CashfreeMode = "production" | "sandbox";
 
+/** Resolve checkout mode: backend response > VITE_CASHFREE_MODE > production */
+export function resolveCashfreeMode(
+  backendMode?: string
+): CashfreeMode {
+  if (backendMode === "sandbox") return "sandbox";
+  if (backendMode === "production") return "production";
+  const viteMode = import.meta.env.VITE_CASHFREE_MODE;
+  if (viteMode === "sandbox") return "sandbox";
+  return "production";
+}
+
 /**
- * Open Cashfree PG 2.0 checkout using payment_session_id from backend.
- * Do NOT navigate to /pg/view/{id} — that URL format is invalid in PG 2.0.
+ * Open Cashfree PG checkout using payment_session_id from backend.
  */
 export async function openCashfreeCheckout(
   paymentSessionId: string,
@@ -74,28 +83,35 @@ export async function openCashfreeCheckout(
     throw new Error("Invalid payment session ID from server");
   }
 
+  const sdkMode = mode === "sandbox" ? "sandbox" : "production";
   console.log("💳 Opening Cashfree checkout:", {
-    sessionId: sessionId.slice(0, 24) + "...",
-    mode,
+    sessionPrefix: sessionId.slice(0, 24) + "...",
+    mode: sdkMode,
   });
 
   await waitForCashfree();
 
-  const cashfree = window.Cashfree({
-    mode: mode === "sandbox" ? "sandbox" : "production",
+  const cashfree = window.Cashfree({ mode: sdkMode });
+
+  const checkoutOptions = {
+    paymentSessionId: sessionId,
+    redirectTarget: "_modal" as const,
+  };
+
+  console.log("💳 Cashfree checkout options:", {
+    paymentSessionId: checkoutOptions.paymentSessionId.slice(0, 24) + "...",
+    redirectTarget: checkoutOptions.redirectTarget,
+    mode: sdkMode,
   });
 
-  const result = await cashfree.checkout({
-    paymentSessionId: sessionId,
-    redirectTarget: "_self",
-  });
+  const result = await cashfree.checkout(checkoutOptions);
 
   if (result?.error) {
     console.error("Cashfree checkout error:", result.error);
     throw new Error(result.error.message || "Cashfree checkout failed");
   }
 
-  console.log("✅ Cashfree checkout initiated");
+  console.log("✅ Cashfree checkout completed or redirected");
 }
 
 declare global {
