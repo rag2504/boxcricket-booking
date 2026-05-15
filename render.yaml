@@ -31,6 +31,8 @@ services:
         sync: false
       - key: EMAIL_PASS
         sync: false
+      - key: EMAIL_FROM
+        value: BoxCric <assignurassignment@gmail.com>
       - key: JWT_SECRET
         sync: false
       - key: FRONTEND_URL

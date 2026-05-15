@@ -1,9 +1,6 @@
 import nodemailer from "nodemailer";
 import { generateBookingReceiptHTML } from "../templates/bookingReceiptTemplate.js";
-import dotenv from "dotenv";
-
-// Load environment variables
-dotenv.config();
+import { getEmailPassword } from "../config/env.js";
 
 // Email transporter configuration (reusing the same config as auth)
 const createTransporter = () => {
@@ -45,7 +42,7 @@ const createTransporter = () => {
       secure: Number(process.env.EMAIL_PORT) === 465, // true for 465, false for 587
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        pass: getEmailPassword(),
       },
       // Optimized timeouts for hosting platforms like Render
       connectionTimeout: Number(process.env.EMAIL_TIMEOUT) || 30000, // Configurable timeout

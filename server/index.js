@@ -1,6 +1,6 @@
+import "./config/env.js";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import mongoose from "mongoose";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -23,9 +23,6 @@ import { adminAuth } from "./middleware/adminAuth.js";
 import { startBookingCleanupService } from "./lib/bookingCleanup.js";
 import { startPeriodicCleanup } from "./lib/bookingUtils.js";
 import Booking from "./models/Booking.js";
-
-// Environment Config
-dotenv.config();
 
 // App and Server Initialization
 const app = express();

@@ -355,11 +355,6 @@ router.post("/create-order", authMiddleware, async (req, res) => {
         mock: true
       });
     }
-        appId: "MOCK_APP_ID",
-        mode: "development",
-        mock: true
-      });
-    }
 
     // Create Cashfree order using SDK
     const orderData = {
