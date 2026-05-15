@@ -5,55 +5,21 @@ import crypto from "crypto";
 import { authMiddleware } from "../middleware/auth.js";
 import Booking from "../models/Booking.js";
 import Ground from "../models/Ground.js";
-import { Cashfree, CFEnvironment } from "cashfree-pg";
 import NotificationService from "../services/notificationService.js";
 import {
   getPaymentCallbackUrl,
   getPaymentWebhookUrl,
 } from "../lib/paymentUrls.js";
+import { getCashfreeConfig, logCashfreeConfig } from "../lib/cashfreeConfig.js";
+import {
+  getCashfreeClient,
+  createCashfreeOrder,
+  fetchCashfreeOrder,
+} from "../services/cashfreeService.js";
 
-// NOTE: For development, we use placeholder HTTPS URLs since Cashfree requires HTTPS
-// In production, these will be your actual domain URLs
+logCashfreeConfig();
 
-// Cashfree credentials
-const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID;
-const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY;
-const CASHFREE_API_URL = process.env.CASHFREE_API_URL || "https://api.cashfree.com/pg"; // Production API
-const CASHFREE_SANDBOX_URL = "https://sandbox.cashfree.com/pg"; // Sandbox API
-const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
-const IS_TEST_MODE = process.env.CASHFREE_MODE === 'test';
-
-// Use mock payments if credentials are not properly configured or account not activated
-const USE_MOCK_PAYMENTS = !CASHFREE_APP_ID || !CASHFREE_SECRET_KEY || 
-                         CASHFREE_APP_ID === 'TEST' || CASHFREE_SECRET_KEY === 'TEST';
-
-// Use sandbox mode only if explicitly set to test mode
-const USE_SANDBOX = IS_TEST_MODE && !USE_MOCK_PAYMENTS;
-
-// Initialize Cashfree SDK only if we have valid credentials
-let cashfree = null;
-if (!USE_MOCK_PAYMENTS) {
-  try {
-    cashfree = new Cashfree(
-      USE_SANDBOX ? CFEnvironment.SANDBOX : CFEnvironment.PRODUCTION,
-      CASHFREE_APP_ID,
-      CASHFREE_SECRET_KEY
-    );
-    console.log(`💳 Cashfree SDK initialized in ${USE_SANDBOX ? 'SANDBOX' : 'PRODUCTION'} mode`);
-  } catch (error) {
-    console.error("❌ Failed to initialize Cashfree SDK:", error);
-    console.log("🔄 Falling back to mock payments");
-  }
-}
-
-// Validate credentials and log status
-if (USE_MOCK_PAYMENTS) {
-  console.log("🧪 Using MOCK PAYMENTS - No real transactions will be processed");
-  console.log("   To enable real payments, set valid CASHFREE_APP_ID and CASHFREE_SECRET_KEY");
-} else if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
-  console.error("❌ Cashfree credentials not found in environment variables!");
-  console.error("   Set CASHFREE_APP_ID and CASHFREE_SECRET_KEY for payment processing");
-}
+const cashfreeCfg = () => getCashfreeConfig();
 
 const router = express.Router();
 
@@ -72,8 +38,8 @@ router.get("/status/:bookingId", async (req, res) => {
     if (booking && booking.payment && booking.payment.cashfreeOrderId) {
       // Try to fetch latest status from Cashfree
       try {
-        const response = await cashfree.PGFetchOrder(booking.payment.cashfreeOrderId);
-        const order_status = response.data.order_status;
+        const paymentDetails = await fetchCashfreeOrder(booking.payment.cashfreeOrderId);
+        const order_status = paymentDetails.order_status;
 
         // Auto-fix: If payment is PAID but booking is still pending, update it
         if (order_status === 'PAID' && booking.status === 'pending') {
@@ -81,7 +47,7 @@ router.get("/status/:bookingId", async (req, res) => {
 
           booking.payment.status = "completed";
           booking.payment.paidAt = new Date();
-          booking.payment.paymentDetails = response.data;
+          booking.payment.paymentDetails = paymentDetails;
           booking.status = "confirmed";
           booking.confirmation = {
             confirmedAt: new Date(),
@@ -99,7 +65,7 @@ router.get("/status/:bookingId", async (req, res) => {
           
           booking.payment.status = "completed";
           booking.payment.paidAt = booking.payment.paidAt || new Date();
-          booking.payment.paymentDetails = response.data;
+          booking.payment.paymentDetails = paymentDetails;
           
           // Ensure booking is confirmed if payment is successful
           if (booking.status !== 'confirmed') {
@@ -182,8 +148,8 @@ router.get("/status/:bookingId", async (req, res) => {
     const { order_id } = req.query;
     if (order_id) {
       try {
-        const response = await cashfree.PGFetchOrder(order_id);
-        const order_status = response.data.order_status;
+        const paymentDetails = await fetchCashfreeOrder(order_id);
+        const order_status = paymentDetails.order_status;
         return res.json({
           success: true,
           status: order_status,
@@ -208,63 +174,39 @@ router.get("/status/:bookingId", async (req, res) => {
 // Test Cashfree connection
 router.get("/test-cashfree", async (req, res) => {
   try {
-    console.log("Testing Cashfree connection...");
-    console.log("Keys:", { 
-      appId: CASHFREE_APP_ID ? "Present" : "Missing",
-      secretKey: CASHFREE_SECRET_KEY ? "Present" : "Missing"
-    });
-    
-    if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
+    const cfg = cashfreeCfg();
+    if (cfg.useMock) {
       return res.status(400).json({
         success: false,
-        message: "Cashfree credentials not configured",
-        error: "Set CASHFREE_APP_ID and CASHFREE_SECRET_KEY in environment variables"
+        message: "Cashfree credentials not configured or CASHFREE_USE_MOCK=true",
       });
     }
-    
-    try {
-      // Test with Cashfree SDK
-      const testOrderData = {
-        order_id: `test_${Date.now()}`,
-        order_amount: 100,
-        order_currency: "INR",
-        customer_details: {
-          customer_id: "test_customer",
-          customer_name: "Test Customer",
-          customer_phone: "9999999999",
-          customer_email: "test@example.com"
-        },
-        order_meta: {
-          return_url: "https://example.com/return",
-          notify_url: "https://example.com/webhook"
-        }
-      };
 
-      const response = await cashfree.PGCreateOrder(testOrderData);
-      console.log("Cashfree connection successful - test order created:", response.data.order_id);
-      
-      res.json({
-        success: true,
-        message: "Cashfree connection successful",
-        appId: CASHFREE_APP_ID.substring(0, 8) + "...",
-        mode: USE_SANDBOX ? "sandbox" : "production",
-        testOrderId: response.data.order_id,
-        paymentSessionId: response.data.payment_session_id
-      });
-    } catch (sdkError) {
-      console.error("Cashfree SDK error:", sdkError.response?.data || sdkError);
-      throw new Error(`Cashfree SDK error: ${sdkError.response?.data?.message || sdkError.message}`);
-    }
+    const data = await createCashfreeOrder({
+      orderId: `test_${Date.now()}`,
+      amount: 1,
+      customerId: "test_customer",
+      customerName: "Test Customer",
+      customerPhone: "9999999999",
+      customerEmail: "test@boxcric.com",
+      returnUrl: `${cfg.frontendUrl}/payment/callback?booking_id=test`,
+      notifyUrl: getPaymentWebhookUrl(),
+    });
+
+    res.json({
+      success: true,
+      message: "Cashfree connection successful",
+      appId: `${cfg.appId.slice(0, 8)}...`,
+      mode: cfg.environment,
+      testOrderId: data.order_id,
+      paymentSessionId: data.payment_session_id,
+    });
   } catch (error) {
     console.error("Cashfree test failed:", error);
-    console.error("Error details:", {
-      message: error.message,
-      stack: error.stack
-    });
     res.status(500).json({
       success: false,
       message: "Cashfree connection failed",
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -308,37 +250,33 @@ router.post("/create-order", authMiddleware, async (req, res) => {
       });
     }
 
-    // Calculate amount in paise (Cashfree needs amount in smallest unit)
-    const totalAmount = booking.pricing?.totalAmount || 500;
-    const amountPaise = Math.round(totalAmount * 100);
+    const totalAmount = Number(booking.pricing?.totalAmount) || 0;
+    console.log("Amount calculation (INR):", totalAmount);
 
-    console.log("Amount calculation:", { totalAmount, amountPaise });
-
-    if (!amountPaise || amountPaise < 100) {
-      console.error("Invalid amount (must be >= 100 paise):", amountPaise);
-      return res.status(400).json({ 
-        success: false, 
-        message: "Booking amount must be at least ₹1" 
+    if (totalAmount < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Booking amount must be at least ₹1",
       });
     }
 
-    // Use mock payments if credentials are invalid or account not activated
-    if (USE_MOCK_PAYMENTS || IS_DEVELOPMENT) {
-      console.log("🧪 Using mock payments: Creating mock payment order");
-      console.log("   Reason:", USE_MOCK_PAYMENTS ? "Invalid/missing credentials" : "Development mode");
-      
+    const cfg = cashfreeCfg();
+    const returnUrl = `${getPaymentCallbackUrl(booking._id)}&order_id={order_id}`;
+    const notifyUrl = getPaymentWebhookUrl();
+
+    // Mock only when credentials missing or CASHFREE_USE_MOCK=true (NOT because NODE_ENV=development)
+    if (cfg.useMock) {
+      console.log("🧪 Mock payment order (CASHFREE_USE_MOCK or missing credentials)");
+
       const mockOrderId = `mock_order_${booking._id}_${Date.now()}`;
       const mockPaymentSessionId = `mock_session_${Date.now()}`;
-      
-      // Update booking with mock payment order details
+
       booking.payment = {
         ...booking.payment,
         cashfreeOrderId: mockOrderId,
-        status: "pending"
+        status: "pending",
       };
       await booking.save();
-
-      console.log("Mock payment order created:", mockOrderId);
 
       const mockPaymentUrl = `${getPaymentCallbackUrl(booking._id)}&order_id=${mockOrderId}&order_status=PAID&mock=true`;
 
@@ -354,123 +292,54 @@ router.post("/create-order", authMiddleware, async (req, res) => {
         },
         appId: "MOCK_APP_ID",
         mode: "mock",
-        mock: true
+        mock: true,
       });
     }
 
-    // Create Cashfree order using SDK
-    const orderData = {
-      order_id: `order_${booking._id}_${Date.now()}`,
-      order_amount: totalAmount,
-      order_currency: "INR",
-      customer_details: {
-        customer_id: userId.toString(),
-        customer_name: booking.playerDetails?.contactPerson?.name || "Customer",
-        customer_phone: booking.playerDetails?.contactPerson?.phone || "",
-        customer_email: booking.playerDetails?.contactPerson?.email || "customer@example.com"
-      },
-      order_meta: {
-        return_url: `${getPaymentCallbackUrl(booking._id)}&order_id={order_id}`,
-        notify_url: getPaymentWebhookUrl(),
-        payment_methods: "cc,dc,nb,upi,paylater,emi",
-      },
-    };
-
-    console.log("Creating Cashfree order with:", orderData);
-    console.log("Test mode:", USE_SANDBOX);
-
-    // Check if credentials are available
-    if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
-      console.error("Cashfree credentials not configured!");
-      return res.status(500).json({
-        success: false,
-        message: "Payment gateway not configured. Please contact support."
-      });
-    }
-    
-    let response;
+    let order;
     try {
-      response = await cashfree.PGCreateOrder(orderData);
-      console.log("Cashfree order created successfully:", response.data.order_id);
+      order = await createCashfreeOrder({
+        orderId: `order_${booking._id}_${Date.now()}`,
+        amount: totalAmount,
+        customerId: userId,
+        customerName: booking.playerDetails?.contactPerson?.name,
+        customerPhone: booking.playerDetails?.contactPerson?.phone,
+        customerEmail: booking.playerDetails?.contactPerson?.email,
+        returnUrl,
+        notifyUrl,
+      });
     } catch (sdkError) {
-      console.error("Cashfree SDK error:", sdkError.response?.data || sdkError);
-      
-      // Handle specific error cases
-      const errorMessage = sdkError.response?.data?.message || sdkError.message || "";
-      
-      // Handle "transactions not enabled" error by falling back to mock payments
-      if (errorMessage.includes("transactions are not enabled")) {
-        console.log("🔄 Cashfree account not activated, falling back to mock payments");
-        
-        const mockOrderId = `mock_order_${booking._id}_${Date.now()}`;
-        const mockPaymentSessionId = `mock_session_${Date.now()}`;
-        
-        // Update booking with mock payment order details
-        booking.payment = {
-          ...booking.payment,
-          cashfreeOrderId: mockOrderId,
-          status: "pending"
-        };
-        await booking.save();
+      const errBody = sdkError.response?.data || sdkError;
+      const errorMessage =
+        errBody?.message || sdkError.message || "Failed to create Cashfree order";
+      console.error("❌ Cashfree SDK error:", errBody);
 
-        console.log("Fallback mock payment order created:", mockOrderId);
-
-        const mockPaymentUrl = `${getPaymentCallbackUrl(booking._id)}&order_id=${mockOrderId}&order_status=PAID&mock=true`;
-
-        return res.json({
-          success: true,
-          order: {
-            id: mockOrderId,
-            amount: totalAmount,
-            currency: "INR",
-            payment_session_id: mockPaymentSessionId,
-            order_status: "ACTIVE",
-            payment_url: mockPaymentUrl,
-          },
-          appId: "MOCK_APP_ID",
-          mode: "mock_fallback",
-          mock: true,
-          message: "Using mock payment due to payment gateway configuration"
+      if (String(errorMessage).includes("transactions are not enabled")) {
+        return res.status(503).json({
+          success: false,
+          message:
+            "Cashfree account is not activated for live payments. Complete KYC in Cashfree dashboard.",
+          code: "CASHFREE_NOT_ACTIVATED",
         });
       }
-      
-      // Handle authentication errors specifically
       if (sdkError.response?.status === 401 || sdkError.response?.status === 403) {
-        throw new Error("Cashfree authentication failed. Please check API credentials.");
+        return res.status(502).json({
+          success: false,
+          message:
+            "Cashfree authentication failed. Verify CASHFREE_APP_ID and CASHFREE_SECRET_KEY match the same environment (sandbox vs production).",
+          code: "CASHFREE_AUTH_FAILED",
+        });
       }
-      
-      throw new Error(errorMessage || "Failed to create Cashfree order");
+      throw new Error(errorMessage);
     }
 
-    // Extract order data from SDK response
-    const order = response.data;
-    console.log("Cashfree order created:", order.order_id);
-    console.log("Full Cashfree response:", JSON.stringify(order, null, 2));
-
-    // Validate required fields from Cashfree response
-    if (!order.order_id || !order.payment_session_id) {
-      console.error("Invalid Cashfree response - missing required fields:", order);
-      throw new Error("Invalid response from Cashfree - missing order_id or payment_session_id");
-    }
-
-    // Update booking with payment order details
     booking.payment = {
       ...booking.payment,
       cashfreeOrderId: order.order_id,
-      status: "pending"
+      cashfreePaymentSessionId: order.payment_session_id,
+      status: "pending",
     };
     await booking.save();
-
-    console.log("Booking updated with payment details");
-
-    // PG 2.0: checkout must use JS SDK with payment_session_id (not /pg/view/{id} URL)
-    const paymentUrl = order.payment_link || null;
-
-    console.log("Cashfree order ready:", {
-      order_id: order.order_id,
-      payment_session_id: order.payment_session_id,
-      payment_link: paymentUrl,
-    });
 
     res.json({
       success: true,
@@ -480,10 +349,11 @@ router.post("/create-order", authMiddleware, async (req, res) => {
         currency: order.order_currency,
         payment_session_id: order.payment_session_id,
         order_status: order.order_status,
-        payment_url: paymentUrl,
+        payment_url: null,
       },
-      appId: CASHFREE_APP_ID,
-      mode: USE_SANDBOX ? "sandbox" : "production",
+      appId: cfg.appId,
+      mode: cfg.environment,
+      mock: false,
     });
   } catch (error) {
     console.error('Cashfree order creation error:', error);
@@ -519,7 +389,7 @@ router.post("/verify-payment", authMiddleware, async (req, res) => {
     }
 
     // Handle mock payment verification for development
-    if (mock || IS_DEVELOPMENT || order_id?.startsWith('mock_')) {
+    if (mock === true || order_id?.startsWith("mock_")) {
       console.log("🧪 Development mode: Mock payment verification");
       
       // Find the booking in MongoDB
@@ -574,8 +444,7 @@ router.post("/verify-payment", authMiddleware, async (req, res) => {
     let paymentDetails;
     try {
       console.log("🔍 Verifying payment with Cashfree for order:", order_id);
-      const response = await cashfree.PGFetchOrder(order_id);
-      paymentDetails = response.data;
+      paymentDetails = await fetchCashfreeOrder(order_id);
       console.log("✅ Payment verification successful:", paymentDetails.order_status);
       console.log("📋 Payment details:", JSON.stringify(paymentDetails, null, 2));
     } catch (sdkError) {

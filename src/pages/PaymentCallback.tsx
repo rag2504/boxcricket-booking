@@ -1,5 +1,9 @@
 // Use the same API base URL logic as the rest of the app
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://box-junu.onrender.com/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV
+    ? "http://localhost:3001/api"
+    : "https://boxcricket-booking.onrender.com/api");
 
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";

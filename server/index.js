@@ -37,6 +37,7 @@ const io = new Server(server, {
       const allowedOrigins = process.env.NODE_ENV === 'production' 
         ? [
             process.env.FRONTEND_URL,
+            'https://boxcricket-booking.vercel.app',
             'https://boxcric.netlify.app',
             'https://box-host.netlify.app',
             'https://box-9t8s1yy3n-tanishs-projects-fa8014b4.vercel.app',
@@ -77,6 +78,7 @@ app.use(cors({
     const allowedOrigins = process.env.NODE_ENV === 'production' 
       ? [
           process.env.FRONTEND_URL,
+          'https://boxcricket-booking.vercel.app',
           'https://boxcric.netlify.app',
           'https://box-host.netlify.app',
           'https://box-9t8s1yy3n-tanishs-projects-fa8014b4.vercel.app',
