@@ -23,14 +23,11 @@ services:
         sync: false
       - key: CASHFREE_API_URL
         value: https://api.cashfree.com/pg
-      - key: EMAIL_HOST
-        value: smtp.gmail.com
-      - key: EMAIL_PORT
-        value: 587
-      - key: EMAIL_USER
+      # Render free tier blocks SMTP (ports 587/465). Use Resend HTTP API instead.
+      - key: RESEND_API_KEY
         sync: false
-      - key: EMAIL_PASS
-        sync: false
+      - key: RESEND_FROM
+        value: BoxCric <onboarding@resend.dev>
       - key: EMAIL_FROM
         value: BoxCric <assignurassignment@gmail.com>
       - key: JWT_SECRET

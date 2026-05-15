@@ -31,8 +31,8 @@ export const healthCheck = (req, res) => {
       type: 'MongoDB Atlas',
     },
     email: {
-      status: process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS ? 'configured' : 'not configured',
-      provider: process.env.EMAIL_HOST || 'not set',
+      status: (process.env.RESEND_API_KEY || process.env.BREVO_API_KEY || (process.env.EMAIL_HOST && process.env.EMAIL_PASS)) ? 'configured' : 'not configured',
+      provider: process.env.RESEND_API_KEY ? 'resend' : process.env.BREVO_API_KEY ? 'brevo' : process.env.EMAIL_HOST || 'not set',
     },
     payments: {
       status: process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY ? 'configured' : 'not configured',

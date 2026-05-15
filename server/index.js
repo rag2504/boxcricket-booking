@@ -20,6 +20,7 @@ import paymentsRoutes from "./routes/payments.js";
 import { adminRouter as adminLocationsRouter } from "./routes/locations.js";
 import notificationRoutes, { adminRouter as adminNotificationsRouter } from "./routes/notifications.js";
 import { adminAuth } from "./middleware/adminAuth.js";
+import { logEmailConfig } from "./services/mailSender.js";
 import { startBookingCleanupService } from "./lib/bookingCleanup.js";
 import { startPeriodicCleanup } from "./lib/bookingUtils.js";
 import Booking from "./models/Booking.js";
@@ -451,6 +452,7 @@ console.log(`PORT: ${PORT}`);
 // Additional debug info
 console.log('Server binding to:', `${HOST}:${PORT}`);
 console.log('Running in environment:', process.env.NODE_ENV || 'development');
+logEmailConfig();
 
 server.listen(PORT, HOST, () => {
   console.log(`🚀 BoxCric API Server running on http://${HOST}:${PORT}`);

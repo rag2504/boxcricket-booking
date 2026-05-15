@@ -1,10 +1,9 @@
 import express from "express";
 import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
 import User from "../models/User.js";
 import OTP from "../models/OTP.js";
 import { authMiddleware } from "../middleware/auth.js";
-import { getEmailPassword } from "../config/env.js";
+import { getEmailProvider, sendEmailWithRetry } from "../services/mailSender.js";
 
 const router = express.Router();
 
@@ -14,61 +13,6 @@ const DEFAULT_TIME_SLOTS = [
   "14:00-15:00", "15:00-16:00", "16:00-17:00", "17:00-18:00",
   "18:00-19:00", "19:00-20:00", "20:00-21:00", "21:00-22:00"
 ];
-
-// Email transporter configuration
-const createTransporter = () => {
-  // Check if email environment variables are configured
-  if (!process.env.EMAIL_HOST || !process.env.EMAIL_PORT || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log("⚠️  Email configuration not found. Using development mode - OTPs will be logged to console.");
-    return null;
-  }
-
-  console.log("📧 Email configuration found:");
-  console.log("EMAIL_HOST:", process.env.EMAIL_HOST);
-  console.log("EMAIL_PORT:", process.env.EMAIL_PORT);
-  console.log("EMAIL_USER:", process.env.EMAIL_USER);
-  console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "SET" : "NOT SET");
-
-  try {
-    const transport = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: Number(process.env.EMAIL_PORT),
-      secure: Number(process.env.EMAIL_PORT) === 465, // true for 465, false for 587
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: getEmailPassword(),
-      },
-      // Optimized timeouts for hosting platforms like Render
-      connectionTimeout: Number(process.env.EMAIL_TIMEOUT) || 30000, // Configurable timeout
-      greetingTimeout: Number(process.env.EMAIL_TIMEOUT) || 30000,
-      socketTimeout: Number(process.env.EMAIL_TIMEOUT) || 60000,
-      // Additional options for better compatibility with hosting platforms
-      tls: {
-        rejectUnauthorized: false,
-        ciphers: 'SSLv3'
-      },
-      // Retry configuration
-      pool: true,
-      maxConnections: 1,
-      maxMessages: 3,
-      // Disable debug in production to reduce logs
-      debug: process.env.NODE_ENV !== 'production',
-      logger: process.env.NODE_ENV !== 'production'
-    });
-    
-    // Skip email verification in production to avoid startup delays
-    // Email verification will happen when actually sending emails
-    console.log("⚠️ Email verification skipped in production to avoid startup delays");
-    console.log("📧 Email will be verified when sending first email");
-    
-    return transport;
-  } catch (error) {
-    console.error("❌ Failed to create email transport:", error);
-    return null;
-  }
-};
-
-const transporter = createTransporter();
 
 // Generate JWT token
 const generateToken = (userId) => {
@@ -137,43 +81,21 @@ const sendOTPEmail = async (email, otp, purpose) => {
   console.log(`   Subject: ${subject[purpose]}`);
   console.log(`   ─────────────────────────────────────────`);
   
-  // If transporter is not available (development mode), just log OTP to console
-  if (!transporter) {
-    console.log(`⚠️ Email transporter not available - OTP will only be logged to console`);
+  if (getEmailProvider() === "none") {
+    console.log(`⚠️ Email not configured - OTP logged to console only`);
     return;
   }
 
-  // Try to send email with retry mechanism
-  let attempts = 0;
-  const maxAttempts = 3;
-  
-  while (attempts < maxAttempts) {
-    try {
-      attempts++;
-      console.log(`📧 Sending email attempt ${attempts}/${maxAttempts}...`);
-      
-      const info = await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
-        to: email,
-        subject: subject[purpose],
-        html: htmlContent,
-      });
-      
-      console.log(`✅ Email sent successfully! Message ID: ${info.messageId}`);
-      return;
-    } catch (error) {
-      console.error(`❌ Email sending error (attempt ${attempts}/${maxAttempts}):`, error);
-      
-      if (attempts >= maxAttempts) {
-        console.log(`📧 [EMAIL FAILED AFTER ${maxAttempts} ATTEMPTS] OTP for ${email}: ${otp}`);
-        // Don't throw error to prevent blocking the registration/login process
-        // The OTP is still saved in the database and logged to console
-        return;
-      }
-      
-      // Wait before retrying (exponential backoff)
-      await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
-    }
+  try {
+    const info = await sendEmailWithRetry({
+      to: email,
+      subject: subject[purpose],
+      html: htmlContent,
+    });
+    console.log(`✅ OTP email sent! (${info.provider}) Message ID: ${info.messageId}`);
+  } catch (error) {
+    console.error(`❌ Email sending failed for ${email}:`, error.message);
+    console.log(`📧 [EMAIL FAILED] OTP for ${email}: ${otp}`);
   }
 };
 
