@@ -13,10 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { paymentsApi, bookingsApi, type ApiErrorBody } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import {
-  openCashfreeCheckout,
-  resolveCashfreeMode,
-} from "@/lib/cashfreeCheckout";
+import { openRazorpayCheckout } from "@/lib/razorpayCheckout";
 
 interface Booking {
   _id?: string;
@@ -44,9 +41,7 @@ interface Booking {
     discount?: number;
     taxes?: number;
     totalAmount?: number;
-    duration?: number;
   };
-  amount?: number;
 }
 
 interface PaymentModalProps {
@@ -60,27 +55,27 @@ type CreateOrderResponse = {
   success?: boolean;
   message?: string;
   code?: string;
-  mode?: string;
-  mock?: boolean;
+  key?: string;
   order?: {
     id: string;
-    payment_session_id: string;
-    amount?: number;
-    mock?: boolean;
-    mode?: string;
+    amount: number;
+    amount_paise?: number;
+    currency?: string;
+  };
+  prefill?: {
+    name?: string;
+    email?: string;
+    contact?: string;
   };
 };
 
 function paymentErrorMessage(error: unknown): string {
   const err = error as ApiErrorBody;
-  if (err.code === "CASHFREE_NOT_ACTIVATED") {
-    return "Cashfree live account is not activated. On Render, set CASHFREE_ENVIRONMENT=SANDBOX with sandbox API keys, or complete KYC for live payments.";
+  if (err.code === "RAZORPAY_NOT_CONFIGURED") {
+    return "Razorpay is not configured on the server. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.";
   }
-  if (err.code === "CASHFREE_ENV_MISMATCH") {
-    return err.message || "Cashfree environment does not match your API keys.";
-  }
-  if (err.code === "CASHFREE_AUTH_FAILED") {
-    return "Cashfree credentials are invalid for the selected environment (sandbox vs production).";
+  if (err.code === "INVALID_SIGNATURE") {
+    return "Payment verification failed. Please contact support if amount was deducted.";
   }
   return err.message || "Payment failed to initialize";
 }
@@ -96,7 +91,7 @@ const PaymentModal = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [temporaryHoldId, setTemporaryHoldId] = useState<string | null>(null);
   const [holdExpiresAt, setHoldExpiresAt] = useState<Date | null>(null);
-  const [countdownTime, setCountdownTime] = useState<number>(0);
+  const [countdownTime, setCountdownTime] = useState(0);
 
   useEffect(() => {
     const createTemporaryHold = async () => {
@@ -174,7 +169,7 @@ const PaymentModal = ({
     let totalAmount = booking.pricing?.totalAmount ?? 0;
     if (!totalAmount && baseAmount > 0) totalAmount = baseAmount - discount + taxes;
 
-    return { ground, baseAmount, discount, taxes, totalAmount, duration };
+    return { ground, baseAmount, discount, taxes, totalAmount };
   }, [booking]);
 
   const formatDate = useCallback((dateString: string) => {
@@ -202,60 +197,91 @@ const PaymentModal = ({
 
     try {
       setIsProcessing(true);
-      console.log("💳 Creating payment order for booking:", bookingId);
+      console.log("💳 Creating Razorpay order for booking:", bookingId);
 
       const orderResponse = (await paymentsApi.createOrder({
         bookingId,
       })) as CreateOrderResponse;
 
-      if (!orderResponse?.success || !orderResponse.order) {
+      if (!orderResponse?.success || !orderResponse.order || !orderResponse.key) {
         throw orderResponse;
       }
 
-      const { order } = orderResponse;
-      const gatewayMode = resolveCashfreeMode(
-        orderResponse.mode || order.mode
-      );
+      const { order, key, prefill } = orderResponse;
+      const amountPaise =
+        order.amount_paise ?? order.amount ?? Math.round(bookingData.totalAmount * 100);
 
-      const isMockPayment =
-        orderResponse.mock === true ||
-        order.mock === true ||
-        order.mode === "mock" ||
-        !order.payment_session_id?.trim() ||
-        order.payment_session_id.startsWith("mock_");
+      await openRazorpayCheckout({
+        key,
+        orderId: order.id,
+        amountPaise,
+        currency: order.currency || "INR",
+        name: "CricBox",
+        description: "Box Cricket Booking Payment",
+        image: "/logo.png",
+        prefill: {
+          name: prefill?.name || user.name || booking.playerDetails.contactPerson.name,
+          email: prefill?.email || user.email || booking.playerDetails.contactPerson.email,
+          contact:
+            prefill?.contact || user.phone || booking.playerDetails.contactPerson.phone,
+        },
+        onSuccess: async (response) => {
+          console.log("💳 Verifying Razorpay payment on server...");
+          const verifyResponse = (await paymentsApi.verifyPayment({
+            bookingId,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          })) as { success?: boolean; message?: string; booking?: Booking };
 
-      if (isMockPayment) {
-        console.log("🧪 Mock payment flow");
-        const verifyResponse = (await paymentsApi.verifyPayment({
-          order_id: order.id,
-          payment_session_id: order.payment_session_id,
-          bookingId,
-          mock: true,
-        })) as { success?: boolean; message?: string };
+          if (!verifyResponse?.success) {
+            throw new Error(verifyResponse?.message || "Payment verification failed");
+          }
 
-        if (!verifyResponse?.success) {
-          throw new Error(verifyResponse?.message || "Mock payment verification failed");
-        }
+          if (temporaryHoldId) {
+            await bookingsApi.releaseTemporaryHold(temporaryHoldId).catch(() => {});
+          }
 
-        if (temporaryHoldId) {
-          await bookingsApi.releaseTemporaryHold(temporaryHoldId).catch(() => {});
-        }
-        onClose();
-        navigate(
-          `/payment/callback?booking_id=${bookingId}&order_id=${order.id}&order_status=PAID&mock=true`
-        );
-        return;
-      }
-
-      console.log("💳 Launching Cashfree checkout, mode:", gatewayMode);
-      await openCashfreeCheckout(order.payment_session_id, gatewayMode);
-      // Modal checkout: user completes payment in popup; callback URL handles confirmation
+          toast.success("Payment successful! Booking confirmed.");
+          onPaymentSuccess(verifyResponse.booking as Booking || booking);
+          onClose();
+          navigate(
+            `/payment/callback?booking_id=${bookingId}&status=success&order_id=${response.razorpay_order_id}`
+          );
+        },
+        onDismiss: () => {
+          toast.info("Payment cancelled");
+          setIsProcessing(false);
+        },
+        onFailure: async () => {
+          await paymentsApi
+            .paymentFailed({
+              bookingId,
+              order_id: order.id,
+              error: { description: "Razorpay payment failed" },
+            })
+            .catch(console.error);
+          toast.error("Payment failed. Please try again.");
+          setIsProcessing(false);
+        },
+      });
     } catch (error: unknown) {
-      console.error("Payment initiation error:", error);
-      toast.error(paymentErrorMessage(error));
+      const err = error as Error;
+      if (err.message !== "Payment cancelled") {
+        console.error("Payment initiation error:", error);
+        toast.error(paymentErrorMessage(error));
+      }
       setIsProcessing(false);
     }
-  }, [booking, user, bookingData, navigate, onClose, temporaryHoldId]);
+  }, [
+    booking,
+    user,
+    bookingData,
+    navigate,
+    onClose,
+    onPaymentSuccess,
+    temporaryHoldId,
+  ]);
 
   if (!booking || !bookingData) return null;
 
@@ -287,7 +313,7 @@ const PaymentModal = ({
             )}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Pay securely with Cashfree
+            Pay securely with Razorpay — CricBox
           </DialogDescription>
         </DialogHeader>
 
@@ -327,7 +353,7 @@ const PaymentModal = ({
           <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl p-4">
             <Shield className="w-5 h-5 text-green-600 mt-0.5" />
             <p className="text-sm text-green-800">
-              Secured by Cashfree. UPI, cards, and net banking supported.
+              Secured by Razorpay. UPI, cards, and net banking supported.
             </p>
           </div>
 
@@ -339,7 +365,7 @@ const PaymentModal = ({
             {isProcessing ? (
               <span className="flex items-center gap-2">
                 <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Opening Cashfree…
+                Opening Razorpay…
               </span>
             ) : (
               <span className="flex items-center gap-2">

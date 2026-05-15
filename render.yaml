@@ -17,23 +17,20 @@ services:
         value: 10000
       - key: MONGODB_URI
         sync: false
-      - key: CASHFREE_APP_ID
+      - key: RAZORPAY_KEY_ID
         sync: false
-      - key: CASHFREE_SECRET_KEY
+      - key: RAZORPAY_KEY_SECRET
         sync: false
-      - key: CASHFREE_ENVIRONMENT
-        value: SANDBOX
       - key: BACKEND_URL
         value: https://boxcricket-booking.onrender.com
       - key: FRONTEND_URL
         value: https://boxcricket-booking.vercel.app
-      # Render free tier blocks SMTP (ports 587/465). Use Resend HTTP API instead.
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM
-        value: BoxCric <onboarding@resend.dev>
+        value: CricBox <onboarding@resend.dev>
       - key: EMAIL_FROM
-        value: BoxCric <assignurassignment@gmail.com>
+        value: CricBox <assignurassignment@gmail.com>
       - key: JWT_SECRET
         sync: false
 

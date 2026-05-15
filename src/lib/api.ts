@@ -162,10 +162,10 @@ export const paymentsApi = {
     api.post("/payments/create-order", data),
 
   verifyPayment: (data: {
-    order_id: string;
-    payment_session_id?: string;
     bookingId: string;
-    mock?: boolean;
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
   }) => api.post("/payments/verify-payment", data),
 
   paymentFailed: (data: {

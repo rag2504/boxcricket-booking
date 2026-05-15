@@ -942,18 +942,19 @@ router.get("/:id", authMiddleware, async (req, res) => {
     }
 
     // Auto-fix: Check if payment is completed but booking is still pending
-    if (booking.status === 'pending' && booking.payment?.cashfreeOrderId) {
+    const razorpayOrderId = booking.payment?.razorpayOrderId;
+    if (booking.status === 'pending' && razorpayOrderId) {
       try {
-        const { fetchCashfreeOrder } = await import('../services/cashfreeService.js');
-        const paymentDetails = await fetchCashfreeOrder(booking.payment.cashfreeOrderId);
-        const order_status = paymentDetails.order_status;
+        const { fetchRazorpayOrder } = await import('../services/razorpayService.js');
+        const order = await fetchRazorpayOrder(razorpayOrderId);
 
-        if (order_status === 'PAID') {
+        if (order.status === 'paid') {
           console.log(`🔧 Auto-fixing booking ${booking.bookingId}: Payment is PAID but booking is pending`);
 
           booking.payment.status = "completed";
           booking.payment.paidAt = new Date();
-          booking.payment.paymentDetails = paymentDetails;
+          booking.payment.paymentDetails = order;
+          booking.payment.razorpayOrderId = razorpayOrderId;
           booking.status = "confirmed";
           booking.confirmation = {
             confirmedAt: new Date(),
@@ -964,8 +965,8 @@ router.get("/:id", authMiddleware, async (req, res) => {
           await booking.save();
           console.log(`✅ Auto-fixed booking ${booking.bookingId} - now confirmed`);
         }
-      } catch (cashfreeError) {
-        console.log(`⚠️ Could not check Cashfree status for booking ${booking.bookingId}:`, cashfreeError.message);
+      } catch (rzpError) {
+        console.log(`⚠️ Could not check Razorpay status for booking ${booking.bookingId}:`, rzpError.message);
       }
     }
 

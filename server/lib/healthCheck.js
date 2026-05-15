@@ -35,8 +35,8 @@ export const healthCheck = (req, res) => {
       provider: process.env.RESEND_API_KEY ? 'resend' : process.env.BREVO_API_KEY ? 'brevo' : process.env.EMAIL_HOST || 'not set',
     },
     payments: {
-      status: process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY ? 'configured' : 'not configured',
-      provider: 'Cashfree',
+      status: process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET ? 'configured' : 'not configured',
+      provider: 'Razorpay',
     },
   };
 

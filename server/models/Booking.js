@@ -46,8 +46,9 @@ const bookingSchema = new mongoose.Schema(
     },
     payment: {
       paymentId: String,
-      cashfreeOrderId: String,
-      cashfreePaymentSessionId: String,
+      razorpayOrderId: String,
+      razorpayPaymentId: String,
+      razorpaySignature: String,
       paymentDetails: Object,
       method: {
         type: String,

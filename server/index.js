@@ -157,11 +157,6 @@ mongoose.connect(MONGODB_URI)
 
 app.set("mongoConnected", () => isMongoConnected);
 
-// Cashfree Configuration
-const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID;
-const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY;
-const CASHFREE_API_URL = process.env.CASHFREE_API_URL || 'https://api.cashfree.com/pg';
-
 // Socket.IO Setup
 io.on("connection", (socket) => {
   console.log("🧠 Socket connected:", socket.id);
@@ -459,14 +454,13 @@ logEmailConfig();
 server.listen(PORT, HOST, () => {
   console.log(`🚀 BoxCric API Server running on http://${HOST}:${PORT}`);
   console.log(`📡 Frontend expected at: ${process.env.FRONTEND_URL || 'http://localhost:8080'}`);
-  console.log(`💳 Cashfree Config:`);
-
-  if (CASHFREE_APP_ID && CASHFREE_SECRET_KEY) {
-    console.log(`   ✅ App ID: ${CASHFREE_APP_ID.slice(0, 6)}...`);
-    console.log(`   ✅ Secret Key: ${CASHFREE_SECRET_KEY.slice(0, 6)}...`);
-    console.log(`   ✅ API URL: ${CASHFREE_API_URL}`);
+  const rzpKey = process.env.RAZORPAY_KEY_ID;
+  console.log(`💳 Razorpay:`);
+  if (rzpKey) {
+    console.log(`   ✅ Key ID: ${rzpKey.slice(0, 12)}...`);
+    console.log(`   ✅ Mode: ${rzpKey.startsWith("rzp_test_") ? "TEST" : "LIVE"}`);
   } else {
-    console.log(`   ❌ Cashfree credentials not set`);
+    console.log(`   ❌ RAZORPAY_KEY_ID not set`);
   }
 });
 
