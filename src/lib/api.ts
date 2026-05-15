@@ -123,6 +123,8 @@ export const bookingsApi = {
 
   getBooking: (id: string) => api.get(`/bookings/${id}`),
 
+  sendReceipt: (id: string) => api.post(`/bookings/${id}/send-receipt`),
+
   updateBookingStatus: (
     id: string,
     data: { status: string; reason?: string },

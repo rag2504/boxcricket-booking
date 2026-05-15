@@ -98,137 +98,109 @@ router.post("/temp-hold", authMiddleware, async (req, res) => {
     const start = new Date(`2000-01-01 ${startTime}`);
     const end = new Date(`2000-01-01 ${endTime}`);
 
-    let session;
-    try {
-      session = await mongoose.startSession();
-      session.startTransaction();
-    } catch (sessionError) {
-      console.error("Failed to create MongoDB session:", sessionError);
-      return res.status(503).json({ 
-        success: false, 
-        message: "Database session creation failed. Please try again." 
-      });
-    }
+    const now = new Date();
 
-    try {
-      // Clean up expired holds first
-      const now = new Date();
-      await Booking.updateMany(
+    // Clear expired holds
+    await Booking.updateMany(
+      {
+        "temporaryHold.isOnHold": true,
+        "temporaryHold.holdExpiresAt": { $lt: now },
+      },
+      {
+        $set: { "temporaryHold.isOnHold": false },
+        $unset: {
+          "temporaryHold.holdStartedAt": "",
+          "temporaryHold.holdExpiresAt": "",
+        },
+      }
+    );
+
+    const conflictingBookings = await Booking.find({
+      groundId,
+      bookingDate: new Date(bookingDate),
+      $or: [
+        { status: "confirmed" },
         {
           "temporaryHold.isOnHold": true,
-          "temporaryHold.holdExpiresAt": { $lt: now }
+          "temporaryHold.holdExpiresAt": { $gt: now },
         },
-        {
-          $set: {
-            "temporaryHold.isOnHold": false
-          },
-          $unset: {
-            "temporaryHold.holdStartedAt": "",
-            "temporaryHold.holdExpiresAt": ""
-          }
-        },
-        { session }
-      );
+        // Same user's pending booking for this slot (payment in progress)
+        { status: "pending", userId },
+      ],
+    });
 
-      // Check for existing confirmed bookings or active temporary holds
-      const conflictingBookings = await Booking.find({
-        groundId,
-        bookingDate: new Date(bookingDate),
-        $or: [
-          { status: "confirmed" },
-          {
-            "temporaryHold.isOnHold": true,
-            "temporaryHold.holdExpiresAt": { $gt: now }
-          }
-        ]
-      }).session(session);
+    const overlappingBooking = conflictingBookings.find((booking) => {
+      const bookingStart = new Date(`2000-01-01 ${booking.timeSlot.startTime}`);
+      const bookingEnd = new Date(`2000-01-01 ${booking.timeSlot.endTime}`);
+      return start < bookingEnd && end > bookingStart;
+    });
 
-      // Check for overlaps
-      const overlappingBooking = conflictingBookings.find(booking => {
-        const bookingStart = new Date(`2000-01-01 ${booking.timeSlot.startTime}`);
-        const bookingEnd = new Date(`2000-01-01 ${booking.timeSlot.endTime}`);
-        return start < bookingEnd && end > bookingStart;
-      });
+    if (overlappingBooking) {
+      const isOwnBooking =
+        overlappingBooking.userId.toString() === userId.toString();
 
-      if (overlappingBooking) {
-        // Check if this is the same user's existing hold
-        const isOwnHold = overlappingBooking.temporaryHold?.isOnHold && 
-                         overlappingBooking.userId.toString() === userId;
-        
-        if (isOwnHold) {
-          // User already has a hold on this slot, return the existing hold info
-          await session.commitTransaction();
-          console.log(`User already has hold: ${overlappingBooking.bookingId}`);
-          
-          return res.json({
-            success: true,
-            holdId: overlappingBooking._id,
-            expiresAt: overlappingBooking.temporaryHold.holdExpiresAt,
-            message: "You already have this slot reserved"
-          });
+      if (isOwnBooking) {
+        if (!overlappingBooking.temporaryHold?.isOnHold) {
+          overlappingBooking.startTemporaryHold(5);
+          await overlappingBooking.save();
         }
-        
-        await session.abortTransaction();
-        const isTemporaryHold = overlappingBooking.temporaryHold?.isOnHold;
-        const message = isTemporaryHold 
-          ? `This time slot is temporarily held by another user. Please try again in a few minutes or select a different time.`
-          : `This time slot (${startTime}-${endTime}) is no longer available. Please select a different time.`;
-        
-        return res.status(409).json({ 
-          success: false, 
-          message,
-          isTemporaryHold
+
+        return res.json({
+          success: true,
+          holdId: overlappingBooking._id,
+          expiresAt: overlappingBooking.temporaryHold.holdExpiresAt,
+          message: "Your booking slot is reserved for payment",
         });
       }
 
-      // Create temporary hold booking
-      const holdBooking = new Booking({
-        userId,
-        groundId,
-        bookingDate: new Date(bookingDate),
-        timeSlot: {
-          startTime,
-          endTime,
-          duration: calculateDuration(startTime, endTime)
-        },
-        status: "pending",
-        // Minimal required fields for temporary hold
-        playerDetails: {
-          playerCount: 1, // Will be updated when actual booking is created
-          contactPerson: {
-            name: "Temporary Hold",
-            phone: "Temp"
-          }
-        },
-        pricing: {
-          baseAmount: 0, // Will be calculated when actual booking is created
-          totalAmount: 0,
-          currency: "INR"
-        },
-        bookingId: `TEMP${Date.now()}${Math.random().toString(36).substr(2, 5)}`.toUpperCase()
+      const isTemporaryHold = overlappingBooking.temporaryHold?.isOnHold;
+      const message = isTemporaryHold
+        ? "This time slot is temporarily held by another user. Please try again shortly."
+        : `This time slot (${startTime}-${endTime}) is no longer available.`;
+
+      return res.status(409).json({
+        success: false,
+        message,
+        isTemporaryHold,
       });
-
-      // Start temporary hold
-      holdBooking.startTemporaryHold(5); // 5 minutes
-      
-      await holdBooking.save({ session });
-      await session.commitTransaction();
-
-      console.log(`Temporary hold created: ${holdBooking.bookingId} for ${startTime}-${endTime}`);
-
-      res.json({
-        success: true,
-        holdId: holdBooking._id,
-        expiresAt: holdBooking.temporaryHold.holdExpiresAt,
-        message: "Slot temporarily reserved for 5 minutes"
-      });
-
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
     }
+
+    const holdBooking = new Booking({
+      userId,
+      groundId,
+      bookingDate: new Date(bookingDate),
+      timeSlot: {
+        startTime,
+        endTime,
+        duration: calculateDuration(startTime, endTime),
+      },
+      status: "pending",
+      playerDetails: {
+        playerCount: 1,
+        contactPerson: {
+          name: "Temporary Hold",
+          phone: "0000000000",
+        },
+      },
+      pricing: {
+        baseAmount: 1,
+        totalAmount: 1,
+        currency: "INR",
+      },
+      bookingId: `TEMP${Date.now()}${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
+    });
+
+    holdBooking.startTemporaryHold(5);
+    await holdBooking.save();
+
+    console.log(`Temporary hold created: ${holdBooking.bookingId} for ${startTime}-${endTime}`);
+
+    res.json({
+      success: true,
+      holdId: holdBooking._id,
+      expiresAt: holdBooking.temporaryHold.holdExpiresAt,
+      message: "Slot temporarily reserved for 5 minutes",
+    });
 
   } catch (error) {
     console.error("Error creating temporary hold:", error);
@@ -957,7 +929,10 @@ router.get("/:id", authMiddleware, async (req, res) => {
     if (!bookingId || bookingId === "undefined") {
       return res.status(400).json({ success: false, message: "Invalid booking ID" });
     }
-    const booking = await Booking.findOne({ _id: bookingId, userId });
+    const query = /^[0-9a-fA-F]{24}$/.test(bookingId)
+      ? { _id: bookingId, userId }
+      : { bookingId, userId };
+    const booking = await Booking.findOne(query);
 
     if (!booking) {
       return res.status(404).json({
@@ -1889,15 +1864,15 @@ router.post("/:id/send-receipt", authMiddleware, async (req, res) => {
       });
     }
 
-    // Check if user owns this booking
-    if (booking.userId.toString() !== userId) {
+    const ownerId = booking.userId?._id?.toString() || booking.userId?.toString();
+    if (ownerId !== userId?.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Access denied"
+        message: "Access denied",
       });
     }
 
-    // Allow receipt email for confirmed bookings (remove strict check for testing)
+    // Allow receipt email for confirmed bookings
     console.log(`📧 Booking status for email: ${booking.status}`);
 
     // Get user details

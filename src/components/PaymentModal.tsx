@@ -14,6 +14,7 @@ import { paymentsApi, bookingsApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { openCashfreeCheckout } from "@/lib/cashfreeCheckout";
 
 // Declare Cashfree types
 declare global {
@@ -439,24 +440,24 @@ const PaymentModal = ({
         return;
       }
 
-      // Use Cashfree SDK for checkout (production only)
-      if (typeof window.Cashfree !== 'undefined' && window.location.hostname !== 'localhost') {
-        const cashfree = window.Cashfree({
-          mode: order.mode || "production"
-        });
-        
-        const checkoutOptions = {
-          paymentSessionId: order.payment_session_id,
-          redirectTarget: "_self"
-        };
-        
-        console.log("Opening Cashfree checkout with:", checkoutOptions);
-        cashfree.checkout(checkoutOptions);
-      } else {
-        const cashfreeUrl =
-          order.payment_url ||
-          `https://payments.cashfree.com/pg/view/${order.payment_session_id}`;
-        window.location.href = cashfreeUrl;
+      // Cashfree PG 2.0 — must use SDK (direct /pg/view URLs are invalid)
+      try {
+        if (order.payment_url && order.payment_url.startsWith("http")) {
+          window.location.href = order.payment_url;
+        } else {
+          await openCashfreeCheckout(
+            order.payment_session_id,
+            order.mode === "sandbox" ? "sandbox" : "production"
+          );
+        }
+      } catch (checkoutError: unknown) {
+        const msg =
+          checkoutError instanceof Error
+            ? checkoutError.message
+            : "Failed to open payment gateway";
+        toast.error(msg);
+        setIsProcessing(false);
+        return;
       }
 
       // Poll for payment completion

@@ -43,18 +43,21 @@ const BookingDetails = () => {
     }
   }, [id, isAuthenticated]);
 
-  // Auto-send email when booking is confirmed (but only if user clearly owns the booking)
+  // Auto-send receipt once when booking is confirmed (uses MongoDB _id for API)
   useEffect(() => {
-    if (booking && booking.status === "confirmed" && !booking.emailSent && isAuthenticated) {
-      // Add a small delay to ensure UI has loaded and user context is stable
+    if (
+      booking &&
+      booking.status === "confirmed" &&
+      !booking.emailSent &&
+      isAuthenticated &&
+      booking._id
+    ) {
       const timer = setTimeout(() => {
-        console.log('📧 Attempting automatic email receipt for confirmed booking:', booking.bookingId || booking._id);
         handleEmailReceipt();
-      }, 1000); // 1 second delay
-      
+      }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [booking, isAuthenticated]);
+  }, [booking?._id, booking?.status, booking?.emailSent, isAuthenticated]);
 
   const fetchBookingDetails = async () => {
     try {
@@ -157,40 +160,16 @@ const BookingDetails = () => {
 
       console.log('📧 Sending receipt email for booking:', booking._id);
 
-      const token = localStorage.getItem('boxcric_token');
-      console.log('🔑 Using token for email:', token ? 'Token present' : 'No token');
-
-      const bookingId = booking.bookingId || booking._id;
-      const apiBase = (import.meta as any).env?.VITE_API_URL || ((import.meta as any).env?.DEV ? 'http://localhost:3001/api' : 'https://box-junu.onrender.com/api');
-      const response = await fetch(`${apiBase}/bookings/${bookingId}/send-receipt`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('📧 Email response status:', response.status);
-      console.log('📧 Email response headers:', response.headers.get('content-type'));
-
-      let data;
-      try {
-        const responseText = await response.text();
-        console.log('📧 Raw response text:', responseText);
-
-        if (responseText.trim()) {
-          data = JSON.parse(responseText);
-        } else {
-          data = { success: false, message: 'Empty response from server' };
-        }
-      } catch (parseError) {
-        console.error('❌ JSON parse error:', parseError);
-        data = { success: false, message: 'Invalid response format from server' };
+      const bookingId = booking._id || booking.id;
+      if (!bookingId) {
+        toast.error("Invalid booking reference");
+        return;
       }
+      const response = await bookingsApi.sendReceipt(bookingId);
 
-      console.log('📧 Parsed email response:', data);
+      const data = response as { success?: boolean; message?: string; error?: string };
 
-      if (data.success) {
+      if (data?.success) {
         // Mark booking as email sent to prevent duplicates
         setBooking((prev: any) => ({ ...prev, emailSent: true }));
         toast.success("Receipt email sent successfully!");
@@ -237,7 +216,11 @@ const BookingDetails = () => {
       }
 
       // Always use API base URL so production doesn't call the frontend domain
-      const apiBase = (import.meta as any).env?.VITE_API_URL || ((import.meta as any).env?.DEV ? 'http://localhost:3001/api' : 'https://box-junu.onrender.com/api');
+      const apiBase =
+        import.meta.env.VITE_API_URL ||
+        (import.meta.env.DEV
+          ? "http://localhost:3001/api"
+          : "https://boxcricket-booking.onrender.com/api");
 
       // Detect mobile browsers
       const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);

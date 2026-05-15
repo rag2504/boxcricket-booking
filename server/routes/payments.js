@@ -463,12 +463,14 @@ router.post("/create-order", authMiddleware, async (req, res) => {
 
     console.log("Booking updated with payment details");
 
-    // Generate payment URL
-    const paymentUrl = order.payment_link || (USE_SANDBOX 
-      ? `https://sandbox.cashfree.com/pg/view/${order.payment_session_id}`
-      : `https://payments.cashfree.com/pg/view/${order.payment_session_id}`);
+    // PG 2.0: checkout must use JS SDK with payment_session_id (not /pg/view/{id} URL)
+    const paymentUrl = order.payment_link || null;
 
-    console.log("Generated payment URL:", paymentUrl);
+    console.log("Cashfree order ready:", {
+      order_id: order.order_id,
+      payment_session_id: order.payment_session_id,
+      payment_link: paymentUrl,
+    });
 
     res.json({
       success: true,
@@ -481,7 +483,7 @@ router.post("/create-order", authMiddleware, async (req, res) => {
         payment_url: paymentUrl,
       },
       appId: CASHFREE_APP_ID,
-      mode: USE_SANDBOX ? "sandbox" : "production"
+      mode: USE_SANDBOX ? "sandbox" : "production",
     });
   } catch (error) {
     console.error('Cashfree order creation error:', error);
