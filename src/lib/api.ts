@@ -60,20 +60,8 @@ export const authApi = {
     password: string;
   }) => api.post("/auth/register", data),
 
-  verifyRegistration: (data: {
-    email: string;
-    otp: string;
-    tempToken: string;
-  }) => api.post("/auth/verify-registration", data),
-
   login: (data: { emailOrPhone: string; password: string }) =>
     api.post("/auth/login", data),
-
-  requestLoginOTP: (data: { email: string }) =>
-    api.post("/auth/request-login-otp", data),
-
-  verifyLoginOTP: (data: { email: string; otp: string }) =>
-    api.post("/auth/verify-login-otp", data),
 
   getMe: () => api.get("/auth/me"),
 

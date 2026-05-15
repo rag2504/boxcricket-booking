@@ -8,13 +8,11 @@ import {
 } from "@/lib/api";
 import { toast } from "sonner";
 
-// API Response types
 interface AuthResponse {
   success: boolean;
   message?: string;
   token?: string;
   user?: User;
-  tempToken?: string;
 }
 
 interface User {
@@ -50,19 +48,12 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (emailOrPhone: string, password: string) => Promise<void>;
-  loginWithOTP: (email: string, otp: string) => Promise<void>;
   register: (data: {
     name: string;
     email: string;
     phone: string;
     password: string;
-  }) => Promise<{ tempToken: string }>;
-  verifyRegistration: (
-    email: string,
-    otp: string,
-    tempToken: string,
-  ) => Promise<void>;
-  requestLoginOTP: (email: string) => Promise<void>;
+  }) => Promise<void>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -84,7 +75,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = !!user;
 
   useEffect(() => {
-    // Check if user is already logged in
     const savedUser = getUser();
     if (savedUser) {
       setUserState(savedUser);
@@ -103,27 +93,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUserState(data.user!);
         toast.success("Login successful!");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Login failed");
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loginWithOTP = async (email: string, otp: string) => {
-    try {
-      setIsLoading(true);
-      const response = await authApi.verifyLoginOTP({ email, otp });
-      const data: AuthResponse = response.data || response;
-      if (data.success) {
-        setAuthToken(data.token!);
-        setUser(data.user!);
-        setUserState(data.user!);
-        toast.success("Login successful!");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "OTP verification failed");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Login failed";
+      toast.error(message);
       throw error;
     } finally {
       setIsLoading(false);
@@ -141,55 +114,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const response = await authApi.register(data);
       const resData: AuthResponse = response.data || response;
       if (resData.success) {
-        toast.success("OTP sent to your email!");
-        return { tempToken: resData.tempToken };
+        setAuthToken(resData.token!);
+        setUser(resData.user!);
+        setUserState(resData.user!);
+        toast.success("Registration successful!");
+        return;
       }
       throw new Error(resData.message);
-    } catch (error: any) {
-      toast.error(error.message || "Registration failed");
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const verifyRegistration = async (
-    email: string,
-    otp: string,
-    tempToken: string,
-  ) => {
-    try {
-      setIsLoading(true);
-      const response = await authApi.verifyRegistration({
-        email,
-        otp,
-        tempToken,
-      });
-      const data: AuthResponse = response.data || response;
-      if (data.success) {
-        setAuthToken(data.token!);
-        setUser(data.user!);
-        setUserState(data.user!);
-        toast.success("Registration successful!");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Verification failed");
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const requestLoginOTP = async (email: string) => {
-    try {
-      setIsLoading(true);
-      const response = await authApi.requestLoginOTP({ email });
-      const data: AuthResponse = response.data || response;
-      if (data.success) {
-        toast.success("OTP sent to your email!");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send OTP");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Registration failed";
+      toast.error(message);
       throw error;
     } finally {
       setIsLoading(false);
@@ -213,10 +148,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isLoading,
     isAuthenticated,
     login,
-    loginWithOTP,
     register,
-    verifyRegistration,
-    requestLoginOTP,
     logout,
     updateUser,
   };

@@ -10,19 +10,24 @@ export function isRenderHosted() {
   return process.env.RENDER === "true" || process.env.RENDER === "1";
 }
 
+function hasSmtpConfig() {
+  return Boolean(
+    process.env.EMAIL_HOST?.trim() &&
+      process.env.EMAIL_USER?.trim() &&
+      getEmailPassword()
+  );
+}
+
 export function getEmailProvider() {
-  if (process.env.RESEND_API_KEY) return "resend";
-  if (process.env.BREVO_API_KEY) return "brevo";
-  if (process.env.SENDGRID_API_KEY) return "sendgrid";
-  if (process.env.EMAIL_PROVIDER === "smtp") return "smtp";
-  if (isRenderHosted()) return "none";
-  if (
-    process.env.EMAIL_HOST &&
-    process.env.EMAIL_USER &&
-    process.env.EMAIL_PASS
-  ) {
-    return "smtp";
-  }
+  if (process.env.RESEND_API_KEY?.trim()) return "resend";
+  if (process.env.BREVO_API_KEY?.trim()) return "brevo";
+  if (process.env.SENDGRID_API_KEY?.trim()) return "sendgrid";
+
+  if (process.env.EMAIL_PROVIDER === "smtp" && hasSmtpConfig()) return "smtp";
+
+  // Gmail SMTP works on localhost; Render free tier blocks ports 587/465
+  if (hasSmtpConfig() && !isRenderHosted()) return "smtp";
+
   return "none";
 }
 
@@ -183,10 +188,12 @@ export async function sendEmail({ to, subject, html, text }) {
     default:
       if (isRenderHosted()) {
         throw new Error(
-          "Email not configured for Render. Add RESEND_API_KEY (recommended) or BREVO_API_KEY — SMTP ports are blocked on free tier."
+          "Email not configured on Render. Add RESEND_API_KEY in Render Environment (https://resend.com). Gmail SMTP is blocked on free tier."
         );
       }
-      throw new Error("Email not configured");
+      throw new Error(
+        "Email not configured. Set EMAIL_HOST, EMAIL_USER, EMAIL_PASS in .env or add RESEND_API_KEY."
+      );
   }
 }
 
@@ -212,10 +219,13 @@ export async function sendEmailWithRetry(options, maxAttempts = 3) {
 
 export function logEmailConfig() {
   const provider = getEmailProvider();
-  console.log(`📧 Email provider: ${provider}`);
-  if (isRenderHosted() && provider === "none") {
+  const onRender = isRenderHosted();
+  console.log(`📧 Email provider: ${provider}${onRender ? " (Render)" : " (local)"}`);
+  console.log(`   RESEND_API_KEY: ${process.env.RESEND_API_KEY?.trim() ? "SET" : "NOT SET"}`);
+  console.log(`   Gmail SMTP: ${hasSmtpConfig() ? "configured" : "not configured"}`);
+  if (onRender && provider === "none") {
     console.warn(
-      "⚠️ Running on Render without RESEND_API_KEY/BREVO_API_KEY — emails will fail (SMTP blocked)."
+      "⚠️ Add RESEND_API_KEY in Render Dashboard → Environment. Free tier blocks Gmail SMTP."
     );
   }
 }

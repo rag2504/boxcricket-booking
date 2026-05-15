@@ -12,11 +12,12 @@ function loadIfExists(filename, override = false) {
   }
 }
 
-// Base file, then environment-specific overrides
+// Base file, then environment-specific overrides.
+// Production file uses override:false so Render/host env vars (e.g. RESEND_API_KEY) are not wiped.
 loadIfExists(".env");
 const nodeEnv = process.env.NODE_ENV || "development";
 if (nodeEnv === "production") {
-  loadIfExists(".env.production", true);
+  loadIfExists(".env.production", false);
 } else {
   loadIfExists(".env.development", true);
   if (!process.env.EMAIL_USER) {
