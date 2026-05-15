@@ -7,6 +7,10 @@ import Booking from "../models/Booking.js";
 import Ground from "../models/Ground.js";
 import { Cashfree, CFEnvironment } from "cashfree-pg";
 import NotificationService from "../services/notificationService.js";
+import {
+  getPaymentCallbackUrl,
+  getPaymentWebhookUrl,
+} from "../lib/paymentUrls.js";
 
 // NOTE: For development, we use placeholder HTTPS URLs since Cashfree requires HTTPS
 // In production, these will be your actual domain URLs
@@ -336,9 +340,7 @@ router.post("/create-order", authMiddleware, async (req, res) => {
 
       console.log("Mock payment order created:", mockOrderId);
 
-      // Generate mock payment URL - use production frontend URL in production
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
-      const mockPaymentUrl = `${frontendUrl}/payment/callback?booking_id=${booking._id}&order_id=${mockOrderId}&order_status=PAID&mock=true`;
+      const mockPaymentUrl = `${getPaymentCallbackUrl(booking._id)}&order_id=${mockOrderId}&order_status=PAID&mock=true`;
 
       return res.json({
         success: true,
@@ -368,11 +370,10 @@ router.post("/create-order", authMiddleware, async (req, res) => {
         customer_email: booking.playerDetails?.contactPerson?.email || "customer@example.com"
       },
       order_meta: {
-        // Always use your real frontend and backend URLs for redirect and webhook
-        return_url: `https://box-junu.vercel.app/payment/callback?booking_id=${booking._id}`,
-  notify_url: `https://box-junu.onrender.com/api/payments/webhook`,
-        payment_methods: "cc,dc,nb,upi,paylater,emi"
-      }
+        return_url: `${getPaymentCallbackUrl(booking._id)}&order_id={order_id}`,
+        notify_url: getPaymentWebhookUrl(),
+        payment_methods: "cc,dc,nb,upi,paylater,emi",
+      },
     };
 
     console.log("Creating Cashfree order with:", orderData);
@@ -414,9 +415,7 @@ router.post("/create-order", authMiddleware, async (req, res) => {
 
         console.log("Fallback mock payment order created:", mockOrderId);
 
-        // Generate mock payment URL
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
-        const mockPaymentUrl = `${frontendUrl}/payment/callback?booking_id=${booking._id}&order_id=${mockOrderId}&order_status=PAID&mock=true`;
+        const mockPaymentUrl = `${getPaymentCallbackUrl(booking._id)}&order_id=${mockOrderId}&order_status=PAID&mock=true`;
 
         return res.json({
           success: true,

@@ -400,12 +400,42 @@ const PaymentModal = ({
         throw new Error("Payment app ID missing from server response.");
       }
 
-      // Check if this is a mock payment (development mode)
-      if (order.mock || order.payment_url?.includes('localhost') || order.mode === 'development') {
-        console.log("🧪 Development mode: Handling mock payment");
-        
-        // For mock payments, directly redirect to the callback URL
-        window.location.href = order.payment_url;
+      const isMockPayment =
+        order.mock ||
+        order.mode === "mock" ||
+        order.mode === "mock_fallback" ||
+        order.payment_url?.includes("localhost");
+
+      // Mock/dev payments: verify in-app then navigate (avoids wrong port / iframe issues)
+      if (isMockPayment) {
+        console.log("🧪 Mock payment: verifying and completing booking");
+        const bookingId = String(booking._id || booking.id);
+        const verifyResponse = await paymentsApi.verifyPayment({
+          order_id: order.id,
+          payment_session_id: order.payment_session_id,
+          bookingId,
+          mock: true,
+        });
+
+        if (!(verifyResponse as { success?: boolean })?.success) {
+          throw new Error(
+            (verifyResponse as { message?: string })?.message ||
+              "Mock payment verification failed"
+          );
+        }
+
+        if (temporaryHoldId) {
+          try {
+            await bookingsApi.releaseTemporaryHold(temporaryHoldId);
+          } catch (error) {
+            console.error("Failed to release hold after payment:", error);
+          }
+        }
+
+        onClose();
+        navigate(
+          `/payment/callback?booking_id=${bookingId}&order_id=${order.id}&order_status=PAID&mock=true`
+        );
         return;
       }
 
@@ -423,14 +453,10 @@ const PaymentModal = ({
         console.log("Opening Cashfree checkout with:", checkoutOptions);
         cashfree.checkout(checkoutOptions);
       } else {
-        // Fallback to direct redirect if SDK not loaded or in development
-        if (window.location.hostname === 'localhost') {
-          console.log("🧪 Development mode: Redirecting to mock payment URL");
-          window.location.href = order.payment_url;
-        } else {
-          const cashfreeUrl = order.payment_url || `https://payments.cashfree.com/pg/view/${order.payment_session_id}`;
-          window.location.href = cashfreeUrl;
-        }
+        const cashfreeUrl =
+          order.payment_url ||
+          `https://payments.cashfree.com/pg/view/${order.payment_session_id}`;
+        window.location.href = cashfreeUrl;
       }
 
       // Poll for payment completion
@@ -514,7 +540,7 @@ const PaymentModal = ({
       toast.error("Payment failed to initialize. Please try again.");
       setIsProcessing(false);
     }
-  }, [booking, user, bookingData, onPaymentSuccess, onClose]);
+  }, [booking, user, bookingData, onPaymentSuccess, onClose, navigate, temporaryHoldId]);
 
   if (!booking || !bookingData) return null;
 

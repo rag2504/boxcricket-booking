@@ -173,6 +173,7 @@ export const paymentsApi = {
     order_id: string;
     payment_session_id: string;
     bookingId: string;
+    mock?: boolean;
   }) => api.post("/payments/verify-payment", data),
 
   paymentFailed: (data: {
