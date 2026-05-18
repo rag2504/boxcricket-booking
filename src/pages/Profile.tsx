@@ -1,15 +1,30 @@
 import { useState, useEffect } from "react";
-import { User, Mail, Phone, Calendar, MapPin, Star, BookOpen } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  User,
+  Mail,
+  Phone,
+  Calendar,
+  BookOpen,
+  ChevronRight,
+  Loader2,
+  Sparkles,
+  Activity,
+  Clock,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Navbar from "@/components/Navbar";
+import PageShell from "@/components/layout/PageShell";
+import { GlassCard } from "@/components/ui/glass-card";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { useAuth } from "@/contexts/AuthContext";
 import { bookingsApi } from "@/lib/api";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { staggerContainer, staggerItem } from "@/lib/motion";
 
 interface BookingData {
   _id: string;
@@ -48,6 +63,56 @@ interface BookingData {
   createdAt: string;
 }
 
+const statusConfig: Record<BookingData["status"], string> = {
+  confirmed: "text-emerald bg-emerald/10 border-emerald/20",
+  pending: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+  cancelled: "text-red-400 bg-red-400/10 border-red-400/20",
+  completed: "text-sky-400 bg-sky-400/10 border-sky-400/20",
+  no_show: "text-muted-foreground bg-white/[0.04] border-white/10",
+};
+
+function AuthGate({
+  title,
+  description,
+  onNavigate,
+}: {
+  title: string;
+  description: string;
+  onNavigate: () => void;
+}) {
+  return (
+    <PageShell>
+      <Navbar />
+      <section className="section-padding pt-4 pb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="container-premium max-w-lg mx-auto"
+        >
+          <GlassCard className="p-10 text-center" glow>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.04] border border-white/[0.08]"
+            >
+              <User className="h-7 w-7 text-muted-foreground/50" />
+            </motion.div>
+            <h3 className="font-display text-lg font-semibold text-foreground mb-2">
+              {title}
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">{description}</p>
+            <Button variant="glow" onClick={onNavigate}>
+              Go to Home
+            </Button>
+          </GlassCard>
+        </motion.div>
+      </section>
+    </PageShell>
+  );
+}
+
 const Profile = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -77,21 +142,6 @@ const Profile = () => {
     }
   };
 
-  const getStatusColor = (status: BookingData["status"]) => {
-    switch (status) {
-      case "confirmed":
-        return "bg-green-100 text-green-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
-      case "completed":
-        return "bg-blue-100 text-blue-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-IN", {
       year: "numeric",
@@ -104,235 +154,420 @@ const Profile = () => {
     return `${timeSlot.startTime} to ${timeSlot.endTime}`;
   };
 
+  const validBookings = bookings.filter((b) => b.groundId);
+  const activeCount = bookings.filter(
+    (b) => b.status === "confirmed" || b.status === "pending",
+  ).length;
+  const completedCount = bookings.filter((b) => b.status === "completed").length;
+
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
-        <Navbar />
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="p-12 text-center">
-              <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Please login to view your profile
-              </h3>
-              <p className="text-gray-600 mb-4">
-                You need to be logged in to access your profile and bookings.
-              </p>
-              <Button 
-                className="bg-cricket-green hover:bg-cricket-green/90"
-                onClick={() => navigate("/")}
-              >
-                Go to Home
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <AuthGate
+        title="Please login to view your profile"
+        description="You need to be logged in to access your profile and bookings."
+        onNavigate={() => navigate("/")}
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
+    <PageShell>
       <Navbar />
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Profile Sidebar */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader className="text-center">
-                <div className="w-24 h-24 bg-gradient-to-r from-cricket-green to-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg border-4 border-white">
-                  <span className="text-3xl font-bold text-white select-none">
-                    {user?.name ? user.name.trim().charAt(0).toUpperCase() : user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
-                  </span>
-                </div>
-                <CardTitle className="text-xl">{user?.name || 'User'}</CardTitle>
-                <p className="text-gray-600">Cricket Enthusiast</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2 text-sm">
-                  <Mail className="w-4 h-4 text-gray-500" />
-                  <span>{user?.email}</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm">
-                  <Phone className="w-4 h-4 text-gray-500" />
-                  <span>{user?.phone}</span>
-                </div>
-                {user?.createdAt && (
-                  <div className="flex items-center space-x-2 text-sm">
-                    <Calendar className="w-4 h-4 text-gray-500" />
-                    <span>Member since {formatDate(user.createdAt)}</span>
-                  </div>
-                )}
+      <section className="section-padding pt-4 pb-20">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="container-premium max-w-6xl"
+        >
+          {/* Page header */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.05 }}
+            className="mb-8"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.05 }}
+              className="flex items-center gap-3 mb-2"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald to-emerald-light shadow-glow-sm"
+              >
+                <User className="h-5 w-5 text-white" />
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.15 }}
+              >
+                <h1 className="heading-display text-2xl sm:text-3xl">My Profile</h1>
+                <p className="text-sm text-muted-foreground">
+                  Your dashboard, stats & booking activity
+                </p>
+              </motion.div>
+            </motion.div>
+          </motion.div>
 
-                <Separator />
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
-                      Total Bookings
-                    </span>
-                    <Badge variant="secondary">{bookings.length}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
-                      Active Bookings
-                    </span>
-                    <Badge variant="secondary">
-                      {bookings.filter(b => b.status === "confirmed" || b.status === "pending").length}
-                    </Badge>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <Button
-                  variant="outline"
-                  className="w-full text-cricket-green border-cricket-green hover:bg-cricket-green/10"
-                  onClick={() => navigate("/")}
+          {/* Analytics strip */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="mb-8"
+          >
+            <GlassCard className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-white/[0.06] p-0 overflow-hidden">
+              {[
+                {
+                  label: "Total",
+                  value: bookings.length,
+                  icon: BookOpen,
+                  accent: false,
+                },
+                {
+                  label: "Active",
+                  value: activeCount,
+                  icon: Activity,
+                  accent: activeCount > 0,
+                },
+                {
+                  label: "Completed",
+                  value: completedCount,
+                  icon: Sparkles,
+                  accent: false,
+                },
+                {
+                  label: "Status",
+                  value: isLoadingBookings ? null : "Live",
+                  icon: Clock,
+                  accent: true,
+                  loading: isLoadingBookings,
+                },
+              ].map((stat) => (
+                <motion.div
+                  key={stat.label}
+                  whileHover={{ backgroundColor: "rgba(255,255,255,0.02)" }}
+                  className="flex flex-col items-center py-5 px-3"
                 >
-                  Book New Ground
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+                  <stat.icon
+                    className={cn(
+                      "h-3.5 w-3.5 mb-2",
+                      stat.accent ? "text-emerald" : "text-muted-foreground/50",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-xl font-bold font-display",
+                      stat.accent ? "text-emerald" : "text-foreground",
+                    )}
+                  >
+                    {stat.loading ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-emerald" />
+                    ) : typeof stat.value === "number" ? (
+                      <AnimatedCounter value={stat.value} />
+                    ) : (
+                      stat.value
+                    )}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">
+                    {stat.label}
+                  </span>
+                </motion.div>
+              ))}
+            </GlassCard>
+          </motion.div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-1">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-              </TabsList>
-
-              {/* Overview Tab */}
-              <TabsContent value="overview" className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Profile Overview
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+          >
+            {/* Profile sidebar */}
+            <motion.div variants={staggerItem} className="lg:col-span-1">
+              <GlassCard className="overflow-hidden" glow>
+                <motion.div
+                  className="relative px-6 pt-8 pb-6 text-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <motion.div
+                    className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald/10 to-transparent pointer-events-none"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  />
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                    className="relative mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-emerald to-emerald-light shadow-glow ring-4 ring-background"
+                  >
+                    <span className="text-3xl font-bold text-white select-none font-display">
+                      {user?.name
+                        ? user.name.trim().charAt(0).toUpperCase()
+                        : user?.email
+                          ? user.email.charAt(0).toUpperCase()
+                          : "U"}
+                    </span>
+                  </motion.div>
+                  <h2 className="font-display text-xl font-bold text-foreground">
+                    {user?.name || "User"}
                   </h2>
-                </div>
+                  <p className="text-sm text-muted-foreground mt-1 flex items-center justify-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-emerald" />
+                    Cricket Enthusiast
+                  </p>
+                </motion.div>
 
-                {/* Quick Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate("/profile/bookings")}>
-                    <CardContent className="p-6">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-cricket-green/10 rounded-lg flex items-center justify-center">
-                          <BookOpen className="w-6 h-6 text-cricket-green" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-lg">My Bookings</h3>
-                          <p className="text-gray-600 text-sm">
+                <div className="px-6 pb-6 space-y-3">
+                  <div className="h-px bg-white/[0.06]" />
+                  <motion.div
+                    whileHover={{ x: 2 }}
+                    className="flex items-center gap-3 text-sm"
+                  >
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald/10 border border-emerald/20"
+                    >
+                      <Mail className="h-3.5 w-3.5 text-emerald" />
+                    </motion.div>
+                    <span className="text-muted-foreground truncate">{user?.email}</span>
+                  </motion.div>
+                  <motion.div
+                    whileHover={{ x: 2 }}
+                    className="flex items-center gap-3 text-sm"
+                  >
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald/10 border border-emerald/20"
+                    >
+                      <Phone className="h-3.5 w-3.5 text-emerald" />
+                    </motion.div>
+                    <span className="text-muted-foreground">{user?.phone}</span>
+                  </motion.div>
+                  {user?.createdAt && (
+                    <motion.div
+                      whileHover={{ x: 2 }}
+                      className="flex items-center gap-3 text-sm"
+                    >
+                      <motion.div
+                        whileHover={{ scale: 1.1 }}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald/10 border border-emerald/20"
+                      >
+                        <Calendar className="h-3.5 w-3.5 text-emerald" />
+                      </motion.div>
+                      <span className="text-muted-foreground">
+                        Member since {formatDate(user.createdAt)}
+                      </span>
+                    </motion.div>
+                  )}
+
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                    <Button
+                      variant="glow"
+                      className="w-full mt-2"
+                      onClick={() => navigate("/")}
+                    >
+                      Book New Ground
+                    </Button>
+                  </motion.div>
+                </div>
+              </GlassCard>
+            </motion.div>
+
+            {/* Main content */}
+            <motion.div variants={staggerItem} className="lg:col-span-2">
+              <Tabs defaultValue="overview" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-1 bg-white/[0.04] border border-white/[0.08] p-1 rounded-xl h-auto">
+                  <TabsTrigger
+                    value="overview"
+                    className="rounded-lg data-[state=active]:bg-emerald/10 data-[state=active]:text-emerald data-[state=active]:border data-[state=active]:border-emerald/20"
+                  >
+                    Overview
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="space-y-6 mt-0">
+                  {/* Quick actions */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <GlassCard
+                      hover
+                      glow
+                      className="p-5 cursor-pointer group"
+                      onClick={() => navigate("/profile/bookings")}
+                    >
+                      <div className="flex items-start gap-4">
+                        <motion.div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald/10 border border-emerald/20 group-hover:shadow-glow-sm transition-shadow">
+                          <BookOpen className="h-6 w-6 text-emerald" />
+                        </motion.div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-display font-semibold text-foreground">
+                              My Bookings
+                            </h3>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald transition-colors" />
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
                             View and manage your cricket ground bookings
                           </p>
-                          <div className="mt-2 flex items-center space-x-4 text-sm">
-                            <span className="text-cricket-green font-medium">
+                          <motion.div
+                            className="mt-3 flex items-center gap-4 text-xs font-medium"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.3 }}
+                          >
+                            <span className="text-emerald">
                               {bookings.length} Total
                             </span>
-                            <span className="text-yellow-600 font-medium">
-                              {bookings.filter(b => b.status === "confirmed" || b.status === "pending").length} Active
-                            </span>
-                          </div>
+                            <span className="text-amber-400">{activeCount} Active</span>
+                          </motion.div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </GlassCard>
 
-                  <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate("/")}>
-                    <CardContent className="p-6">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-sky-blue/10 rounded-lg flex items-center justify-center">
-                          <Calendar className="w-6 h-6 text-sky-blue" />
+                    <GlassCard
+                      hover
+                      className="p-5 cursor-pointer group"
+                      onClick={() => navigate("/")}
+                    >
+                      <motion.div
+                        className="flex items-start gap-4"
+                        whileHover={{ x: 2 }}
+                      >
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sky-400/10 border border-sky-400/20">
+                          <Calendar className="h-6 w-6 text-sky-400" />
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-lg">Book New Ground</h3>
-                          <p className="text-gray-600 text-sm">
+                        <motion.div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-display font-semibold text-foreground">
+                              Book New Ground
+                            </h3>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald transition-colors" />
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
                             Discover and book cricket grounds near you
                           </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                        </motion.div>
+                      </motion.div>
+                    </GlassCard>
+                  </div>
 
-                {/* Recent Bookings Summary */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>Recent Bookings</span>
-                      <Button 
-                        variant="outline" 
+                  {/* Recent bookings */}
+                  <GlassCard className="overflow-hidden">
+                    <div className="flex items-center justify-between gap-4 p-5 border-b border-white/[0.06]">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-emerald" />
+                        <h2 className="font-display font-semibold text-foreground">
+                          Recent Bookings
+                        </h2>
+                      </div>
+                      <Button
+                        variant="outline"
                         size="sm"
+                        className="border-emerald/20 text-emerald hover:bg-emerald/10 hover:text-emerald shrink-0"
                         onClick={() => navigate("/profile/bookings")}
                       >
                         View All
                       </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingBookings ? (
-                      <div className="space-y-3">
-                        {[1, 2].map((i) => (
-                          <div key={i} className="animate-pulse">
-                            <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
-                            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : bookings.filter(b => b.groundId).length > 0 ? (
-                      <div className="space-y-3">
-                        {bookings.filter(b => b.groundId).slice(0, 3).map((booking) => (
-                          <div key={booking._id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-1">
-                                <h4 className="font-medium">
-                                  {booking.groundId ? booking.groundId.name : "Unknown Ground"}
-                                </h4>
-                                <Badge className={getStatusColor(booking.status)} size="sm">
-                                  {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-gray-600">
-                                {formatDate(booking.bookingDate)} • {formatTime(booking.timeSlot)}
-                              </p>
+                    </div>
+
+                    <div className="p-5">
+                      {isLoadingBookings ? (
+                        <div className="space-y-3">
+                          {[1, 2].map((i) => (
+                            <div key={i} className="animate-pulse rounded-xl p-4 bg-white/[0.03] border border-white/[0.06]">
+                              <motion.div
+                                className="h-4 bg-white/[0.06] rounded w-1/3 mb-2"
+                                animate={{ opacity: [0.4, 0.8, 0.4] }}
+                                transition={{ duration: 1.5, repeat: Infinity }}
+                              />
+                              <motion.div
+                                className="h-3 bg-white/[0.04] rounded w-1/2"
+                                animate={{ opacity: [0.4, 0.8, 0.4] }}
+                                transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+                              />
                             </div>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => navigate(`/booking/${booking._id}`)}
-                            >
-                              View
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
-                          No bookings yet
-                        </h3>
-                        <p className="text-gray-600 mb-4">
-                          Start exploring cricket grounds and make your first booking!
-                        </p>
-                        <Button 
-                          className="bg-cricket-green hover:bg-cricket-green/90"
-                          onClick={() => navigate("/")}
+                          ))}
+                        </div>
+                      ) : validBookings.length > 0 ? (
+                        <motion.div
+                          variants={staggerContainer}
+                          initial="hidden"
+                          animate="visible"
+                          className="space-y-3"
                         >
-                          Explore Grounds
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </div>
-      </div>
-    </div>
+                          {validBookings.slice(0, 3).map((booking) => (
+                            <motion.div key={booking._id} variants={staggerItem}>
+                              <GlassCard
+                                hover
+                                className="flex items-center justify-between gap-3 p-4"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    <h4 className="font-medium text-sm text-foreground truncate">
+                                      {booking.groundId
+                                        ? booking.groundId.name
+                                        : "Unknown Ground"}
+                                    </h4>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[10px] font-medium border capitalize",
+                                        statusConfig[booking.status],
+                                      )}
+                                    >
+                                      {booking.status.replace("_", " ")}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatDate(booking.bookingDate)} ·{" "}
+                                    {formatTime(booking.timeSlot)}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="shrink-0 border-emerald/20 text-emerald hover:bg-emerald/10 hover:text-emerald"
+                                  onClick={() => navigate(`/booking/${booking._id}`)}
+                                >
+                                  View
+                                </Button>
+                              </GlassCard>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      ) : (
+                        <div className="text-center py-10">
+                          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald/10 border border-emerald/20">
+                            <Calendar className="h-6 w-6 text-emerald" />
+                          </div>
+                          <h3 className="font-display font-semibold text-foreground mb-2">
+                            No bookings yet
+                          </h3>
+                          <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto">
+                            Start exploring cricket grounds and make your first booking!
+                          </p>
+                          <Button variant="glow" onClick={() => navigate("/")}>
+                            Explore Grounds
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </GlassCard>
+                </TabsContent>
+              </Tabs>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      </section>
+    </PageShell>
   );
 };
 
 export default Profile;
-

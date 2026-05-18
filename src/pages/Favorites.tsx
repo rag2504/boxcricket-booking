@@ -1,12 +1,25 @@
 import { useState, useEffect } from "react";
-import { Heart, Star, MapPin, ArrowLeft, Calendar, Clock, Users } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  Heart,
+  Star,
+  MapPin,
+  ArrowLeft,
+  Calendar,
+  Clock,
+  Users,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
+import PageShell from "@/components/layout/PageShell";
+import { GlassCard } from "@/components/ui/glass-card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { staggerContainer, staggerItem } from "@/lib/motion";
 
 interface FavoriteGround {
   _id: string;
@@ -39,8 +52,177 @@ interface FavoriteGround {
   };
 }
 
+function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <GlassCard className="p-12 sm:p-16 text-center">
+      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+        <Icon className="h-7 w-7 text-muted-foreground/50" />
+      </div>
+      <h3 className="font-display text-xl sm:text-2xl font-semibold text-foreground mb-3">
+        {title}
+      </h3>
+      <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">{description}</p>
+      {children}
+    </GlassCard>
+  );
+}
+
+function FavoriteSkeleton() {
+  return (
+    <GlassCard className="overflow-hidden">
+      <div className="animate-pulse">
+        <div className="h-48 bg-white/[0.04]" />
+        <div className="p-5 space-y-3">
+          <div className="h-4 bg-white/[0.06] rounded-lg w-3/4" />
+          <div className="h-3 bg-white/[0.04] rounded-lg w-1/2" />
+          <div className="h-3 bg-white/[0.04] rounded-lg w-2/3" />
+          <div className="flex gap-2 pt-2">
+            <div className="h-9 bg-white/[0.04] rounded-xl flex-1" />
+            <div className="h-9 bg-white/[0.06] rounded-xl flex-1" />
+          </div>
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
+function FavoriteCard({
+  ground,
+  onRemove,
+  onViewDetails,
+  onBook,
+}: {
+  ground: FavoriteGround;
+  onRemove: (id: string) => void;
+  onViewDetails: (id: string) => void;
+  onBook: (id: string) => void;
+}) {
+  return (
+    <GlassCard hover className="group overflow-hidden">
+      <div className="relative">
+        <motion.img
+          whileHover={{ scale: 1.05 }}
+          transition={{ duration: 0.5 }}
+          src={ground.images?.[0]?.url || "/placeholder.svg"}
+          alt={ground.name}
+          className="w-full h-48 object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+
+        <div className="absolute top-3 right-3">
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => onRemove(ground._id)}
+            className="h-9 w-9 p-0 bg-red-500/80 hover:bg-red-600 backdrop-blur-sm border border-red-400/20"
+          >
+            <Heart className="w-4 h-4 fill-current" />
+          </Button>
+        </div>
+
+        {ground.availability && (
+          <div className="absolute top-3 left-3">
+            <Badge
+              className={cn(
+                "backdrop-blur-sm border",
+                ground.availability.isAvailable
+                  ? "bg-emerald/20 text-emerald border-emerald/30"
+                  : "bg-red-500/20 text-red-400 border-red-500/30",
+              )}
+            >
+              {ground.availability.isAvailable ? "Available" : "Busy"}
+            </Badge>
+          </div>
+        )}
+
+        <div className="absolute bottom-3 right-3 rounded-xl border border-white/10 bg-background/80 px-3 py-2 backdrop-blur-md shadow-glow-sm">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">From</p>
+          <p className="font-display text-lg font-bold text-emerald">
+            ₹{ground.price.perHour}/hr
+          </p>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-3">
+        <div>
+          <h3 className="font-display text-lg font-bold text-foreground mb-1 group-hover:text-emerald transition-colors line-clamp-1">
+            {ground.name}
+          </h3>
+          <div className="flex items-center text-sm text-muted-foreground">
+            <MapPin className="w-3.5 h-3.5 mr-1.5 shrink-0 text-emerald" />
+            <span className="truncate">{ground.location.address}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+            <span className="font-semibold">{ground.rating.average}</span>
+            <span className="text-sm text-muted-foreground">({ground.rating.count})</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5" />
+            <span>{ground.features.capacity} players</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {ground.features.lighting && (
+              <Badge variant="outline" className="text-xs border-white/10 bg-white/[0.03]">
+                Lights
+              </Badge>
+            )}
+            {ground.features.parking && (
+              <Badge variant="outline" className="text-xs border-white/10 bg-white/[0.03]">
+                Parking
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {ground.availability?.nextSlot && (
+          <div className="flex items-center text-sm text-emerald bg-emerald/10 border border-emerald/20 p-2.5 rounded-xl">
+            <Clock className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+            <span>Next available: {ground.availability.nextSlot}</span>
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onViewDetails(ground._id)}
+            className="flex-1"
+          >
+            View Details
+          </Button>
+          <Button
+            variant="glow"
+            size="sm"
+            onClick={() => onBook(ground._id)}
+            className="flex-1"
+          >
+            Book Now
+          </Button>
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
 const Favorites = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [favorites, setFavorites] = useState<FavoriteGround[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,7 +233,6 @@ const Favorites = () => {
     }
   }, [isAuthenticated]);
 
-  // Listen for localStorage changes to sync favorites
   useEffect(() => {
     const handleStorageChange = () => {
       if (isAuthenticated) {
@@ -59,31 +240,27 @@ const Favorites = () => {
       }
     };
 
-    // Listen for storage changes from other tabs/components
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also listen for custom events from the same tab
-    window.addEventListener('favoritesChanged', handleStorageChange);
-    
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("favoritesChanged", handleStorageChange);
+
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('favoritesChanged', handleStorageChange);
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("favoritesChanged", handleStorageChange);
     };
   }, [isAuthenticated]);
 
   const fetchFavorites = async () => {
     try {
       setIsLoading(true);
-      
-      // Read favorites from localStorage
-      const savedFavorites = localStorage.getItem('boxcric_favorites');
+
+      const savedFavorites = localStorage.getItem("boxcric_favorites");
       if (savedFavorites) {
         const favoritesList = JSON.parse(savedFavorites);
         setFavorites(favoritesList);
       } else {
         setFavorites([]);
       }
-      
+
       setIsLoading(false);
     } catch (error) {
       console.error("Failed to fetch favorites:", error);
@@ -95,16 +272,16 @@ const Favorites = () => {
 
   const removeFavorite = async (groundId: string) => {
     try {
-      // Update localStorage
-      const savedFavorites = localStorage.getItem('boxcric_favorites');
+      const savedFavorites = localStorage.getItem("boxcric_favorites");
       if (savedFavorites) {
         const favoritesList = JSON.parse(savedFavorites);
-        const updatedFavorites = favoritesList.filter((fav: FavoriteGround) => fav._id !== groundId);
-        localStorage.setItem('boxcric_favorites', JSON.stringify(updatedFavorites));
+        const updatedFavorites = favoritesList.filter(
+          (fav: FavoriteGround) => fav._id !== groundId,
+        );
+        localStorage.setItem("boxcric_favorites", JSON.stringify(updatedFavorites));
       }
-      
-      // Update state
-      setFavorites(prev => prev.filter(fav => fav._id !== groundId));
+
+      setFavorites((prev) => prev.filter((fav) => fav._id !== groundId));
       toast.success("Removed from favorites");
     } catch (error) {
       console.error("Failed to remove favorite:", error);
@@ -122,219 +299,119 @@ const Favorites = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
+      <PageShell>
         <Navbar />
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Heart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Please login to view your favorites
-              </h3>
-              <p className="text-gray-600 mb-4">
-                You need to be logged in to access your favorite grounds.
-              </p>
-              <Button 
-                className="bg-cricket-green hover:bg-cricket-green/90"
-                onClick={() => navigate("/")}
-              >
+        <section className="section-padding pt-4 pb-16">
+          <div className="container-premium max-w-2xl">
+            <EmptyState
+              icon={Heart}
+              title="Please login to view your favorites"
+              description="You need to be logged in to access your favorite grounds."
+            >
+              <Button variant="glow" onClick={() => navigate("/")}>
                 Go to Home
               </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+            </EmptyState>
+          </div>
+        </section>
+      </PageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
+    <PageShell>
       <Navbar />
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              onClick={() => navigate("/profile")}
-              className="flex items-center space-x-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back to Profile</span>
-            </Button>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center space-x-2">
-              <Heart className="w-8 h-8 text-red-500" />
-              <span>Favorite Grounds</span>
-            </h1>
-          </div>
-          <Button 
-            className="bg-cricket-green hover:bg-cricket-green/90"
-            onClick={() => navigate("/")}
+      <section className="section-padding pt-4 pb-16">
+        <div className="container-premium">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8"
           >
-            Discover More Grounds
-          </Button>
-        </div>
-
-        {/* Favorites Content */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="overflow-hidden">
-                <div className="animate-pulse">
-                  <div className="h-48 bg-gray-200"></div>
-                  <div className="p-4 space-y-3">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                  </div>
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/profile")}
+                className="gap-2 text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Profile</span>
+              </Button>
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-500 shadow-glow-sm">
+                  <Heart className="h-5 w-5 text-white fill-white" />
                 </div>
-              </Card>
-            ))}
-          </div>
-        ) : favorites.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {favorites.map((ground) => (
-              <Card key={ground._id} className="group overflow-hidden hover:shadow-xl transition-all duration-300">
-                <div className="relative">
-                  <img
-                    src={ground.images?.[0]?.url || "/placeholder.svg"}
-                    alt={ground.name}
-                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute top-3 right-3">
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => removeFavorite(ground._id)}
-                      className="bg-red-500/80 hover:bg-red-600 backdrop-blur-sm"
-                    >
-                      <Heart className="w-4 h-4 fill-current" />
-                    </Button>
-                  </div>
-                  {ground.availability && (
-                    <div className="absolute top-3 left-3">
-                      <Badge 
-                        className={ground.availability.isAvailable 
-                          ? "bg-green-500 text-white" 
-                          : "bg-red-500 text-white"
-                        }
-                      >
-                        {ground.availability.isAvailable ? "Available" : "Busy"}
-                      </Badge>
-                    </div>
+                <div>
+                  <h1 className="heading-display text-2xl sm:text-3xl">Favorite Grounds</h1>
+                  {!isLoading && favorites.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {favorites.length} saved {favorites.length === 1 ? "ground" : "grounds"}
+                    </p>
                   )}
                 </div>
+              </div>
+            </div>
+            <Button variant="glow" onClick={() => navigate("/")} className="gap-2 shrink-0">
+              <Sparkles className="w-4 h-4" />
+              Discover More Grounds
+            </Button>
+          </motion.div>
 
-                <CardContent className="p-4">
-                  <div className="space-y-3">
-                    <div>
-                      <h3 className="font-semibold text-lg mb-1 group-hover:text-cricket-green transition-colors">
-                        {ground.name}
-                      </h3>
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
-                        <MapPin className="w-3 h-3 mr-1" />
-                        <span className="truncate">{ground.location.address}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-medium">{ground.rating.average}</span>
-                        <span className="text-sm text-gray-600">({ground.rating.count})</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-cricket-green">
-                          ₹{ground.price.perHour}/hour
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm text-gray-600">
-                      <div className="flex items-center space-x-1">
-                        <Users className="w-3 h-3" />
-                        <span>{ground.features.capacity} players</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {ground.features.lighting && (
-                          <Badge variant="outline" className="text-xs">
-                            Lights
-                          </Badge>
-                        )}
-                        {ground.features.parking && (
-                          <Badge variant="outline" className="text-xs">
-                            Parking
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {ground.availability?.nextSlot && (
-                      <div className="flex items-center text-sm text-green-600 bg-green-50 p-2 rounded">
-                        <Clock className="w-3 h-3 mr-1" />
-                        <span>Next available: {ground.availability.nextSlot}</span>
-                      </div>
-                    )}
-
-                    <div className="flex space-x-2 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDetails(ground._id)}
-                        className="flex-1"
-                      >
-                        View Details
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleBookGround(ground._id)}
-                        className="flex-1 bg-cricket-green hover:bg-cricket-green/90"
-                      >
-                        Book Now
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="p-16 text-center">
-              <Heart className="w-16 h-16 text-gray-400 mx-auto mb-6" />
-              <h3 className="text-2xl font-semibold text-gray-900 mb-4">
-                No favorites yet
-              </h3>
-              <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                Start exploring cricket grounds and add them to your favorites for quick access. 
-                Click the heart icon on any ground to save it here!
-              </p>
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <FavoriteSkeleton key={i} />
+              ))}
+            </div>
+          ) : favorites.length > 0 ? (
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {favorites.map((ground) => (
+                <motion.div key={ground._id} variants={staggerItem}>
+                  <FavoriteCard
+                    ground={ground}
+                    onRemove={removeFavorite}
+                    onViewDetails={handleViewDetails}
+                    onBook={handleBookGround}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : (
+            <EmptyState
+              icon={Heart}
+              title="No favorites yet"
+              description="Start exploring cricket grounds and add them to your favorites for quick access. Click the heart icon on any ground to save it here!"
+            >
               <div className="space-y-3">
-                <Button
-                  className="bg-cricket-green hover:bg-cricket-green/90"
-                  onClick={() => navigate("/")}
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
+                <Button variant="glow" onClick={() => navigate("/")} className="gap-2">
+                  <Calendar className="w-4 h-4" />
                   Discover Grounds
                 </Button>
-                <div className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Or browse by{" "}
                   <Button
                     variant="link"
                     size="sm"
-                    className="p-0 h-auto text-cricket-green"
+                    className="p-0 h-auto"
                     onClick={() => navigate("/")}
                   >
                     location
                   </Button>
-                </div>
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </div>
+            </EmptyState>
+          )}
+        </div>
+      </section>
+    </PageShell>
   );
 };
 

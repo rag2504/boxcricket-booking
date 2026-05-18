@@ -1,6 +1,23 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Search, Filter, Menu, X, User, MapPin, LogOut, Heart, BookOpen, Bell, Home, Info, HelpCircle, Settings } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Search,
+  Filter,
+  Menu,
+  X,
+  User,
+  MapPin,
+  LogOut,
+  Heart,
+  BookOpen,
+  Bell,
+  Home,
+  Info,
+  HelpCircle,
+  Settings,
+  ChevronDown,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,12 +49,22 @@ const Navbar = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalTab, setAuthModalTab] = useState<"login" | "register">(
-    "login",
-  );
+  const [authModalTab, setAuthModalTab] = useState<"login" | "register">("login");
+  const [scrolled, setScrolled] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,352 +83,304 @@ const Navbar = ({
 
   const navItems = [
     { name: "Home", path: "/", icon: Home },
-    { name: "About Us", path: "/about", icon: Info },
-    { name: "Help & Support", path: "/help", icon: HelpCircle },
+    { name: "About", path: "/about", icon: Info },
+    { name: "Help", path: "/help", icon: HelpCircle },
   ];
 
-  const getUserInitials = (name: string) => {
-    return name
+  const getUserInitials = (name: string) =>
+    name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2);
-  };
 
   return (
     <>
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* BoxCric Logo - Positioned at the far left */}
-            <div className="flex-shrink-0 mr-4">
-              <Link to="/" className="flex items-center space-x-2 sm:space-x-3 group">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-cricket rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-md">
-                  <div className="w-6 h-6 sm:w-7 sm:h-7 bg-white rounded-lg flex items-center justify-center">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-cricket-green rounded-md"></div>
-                  </div>
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          scrolled ? "py-2" : "py-4",
+        )}
+      >
+        <nav
+          className={cn(
+            "mx-auto max-w-7xl px-4 sm:px-6 transition-all duration-300",
+            scrolled
+              ? "rounded-2xl border border-white/[0.08] bg-background/80 backdrop-blur-xl shadow-glass"
+              : "bg-transparent",
+          )}
+        >
+          <div className="flex h-14 items-center justify-between gap-4">
+            {/* Logo */}
+            <Link to="/" className="group flex shrink-0 items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-xl bg-emerald/30 blur-md opacity-0 transition-opacity group-hover:opacity-100" />
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald to-emerald-light shadow-glow-sm">
+                  <span className="font-display text-sm font-bold text-white">CB</span>
                 </div>
-                <div className="text-left">
-                  <h1 className="text-xl sm:text-2xl font-bold font-display text-cricket-green group-hover:text-cricket-green/80 transition-colors">
-                    BoxCric
-                  </h1>
-                  <p className="hidden xs:block text-xs text-gray-500 -mt-0.5 sm:-mt-1 font-medium">Book. Play. Win.</p>
-                </div>
-              </Link>
-            </div>
+              </div>
+              <div className="hidden sm:block">
+                <span className="font-display text-lg font-bold tracking-tight text-foreground">
+                  CricBox
+                </span>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                  Book · Play · Win
+                </p>
+              </div>
+            </Link>
 
-            {/* Desktop Navigation - Centered */}
-            <div className="hidden md:flex items-center space-x-4 lg:space-x-8 flex-1 justify-center">
+            {/* Desktop Nav */}
+            <div className="hidden md:flex items-center gap-1">
               {navItems.map((item) => (
                 <Link
-                  key={item.name}
+                  key={item.path}
                   to={item.path}
-                  className="text-gray-700 hover:text-cricket-green transition-colors duration-200 font-medium relative group"
+                  className={cn(
+                    "relative px-4 py-2 text-sm font-medium transition-colors rounded-lg",
+                    location.pathname === item.path
+                      ? "text-emerald"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
                 >
                   {item.name}
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-cricket-green transition-all duration-200 group-hover:w-full"></span>
+                  {location.pathname === item.path && (
+                    <motion.div
+                      layoutId="nav-indicator"
+                      className="absolute inset-0 rounded-lg bg-emerald/10 border border-emerald/20"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
                 </Link>
               ))}
             </div>
 
-            {/* Mobile menu button placeholder - actual menu is at the bottom */}
-
-            {/* Search Bar and Actions - Right side */}
-            <div className="hidden md:flex items-center space-x-4 flex-shrink-0">
-              {/* Location Selector */}
+            {/* Desktop Actions */}
+            <div className="hidden md:flex items-center gap-2">
               <Button
-                variant="outline"
+                variant="glass"
                 size="sm"
                 onClick={onCitySelect}
-                className="flex items-center space-x-2 hover:bg-cricket-green/5 hover:border-cricket-green/20 transition-colors"
+                className="gap-2"
               >
-                <MapPin className="w-4 h-4" />
-                <span className="text-sm font-medium">{selectedCity || "Select City"}</span>
+                <MapPin className="h-3.5 w-3.5 text-emerald" />
+                <span className="max-w-[120px] truncate">
+                  {selectedCity || "Select City"}
+                </span>
+                <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
 
-              {/* Search */}
               <form onSubmit={handleSearch} className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder="Search grounds..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-72 pl-10 pr-4 border-gray-200 focus:border-cricket-green focus:ring-cricket-green/20"
+                  className="w-52 pl-9 h-9"
                 />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               </form>
 
-              {/* Filter */}
               {onFilterToggle && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onFilterToggle}
-                  className="flex items-center space-x-2 hover:bg-cricket-green/5 hover:border-cricket-green/20 transition-colors"
-                >
-                  <Filter className="w-4 h-4" />
-                  <span className="hidden lg:inline">Filters</span>
+                <Button variant="glass" size="icon" onClick={onFilterToggle}>
+                  <Filter className="h-4 w-4" />
                 </Button>
               )}
 
-              {/* Auth Section */}
               {isAuthenticated && user ? (
-                <div className="flex items-center space-x-3">
-                  {/* New Notification Panel */}
+                <div className="flex items-center gap-2 ml-1">
                   <NotificationPanel />
-                  
-                  {/* User Menu */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="flex items-center space-x-3 h-10 hover:bg-gray-100"
-                      >
-                        <Avatar className="w-8 h-8">
+                      <Button variant="ghost" className="gap-2 pl-2 pr-3 h-10">
+                        <Avatar className="h-8 w-8 ring-2 ring-emerald/20">
                           <AvatarImage src={user.avatar} />
-                          <AvatarFallback className="bg-cricket-green text-white text-sm font-semibold">
+                          <AvatarFallback className="bg-emerald text-white text-xs font-bold">
                             {getUserInitials(user.name)}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="hidden lg:block text-left">
-                          <div className="text-sm font-medium text-gray-900">
-                            {user.name.split(" ")[0]}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {user.email}
-                          </div>
-                        </div>
+                        <span className="hidden lg:block text-sm font-medium max-w-[80px] truncate">
+                          {user.name.split(" ")[0]}
+                        </span>
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-64">
-                      <div className="px-3 py-2 border-b border-gray-100">
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="w-10 h-10">
-                            <AvatarImage src={user.avatar} />
-                            <AvatarFallback className="bg-cricket-green text-white">
-                              {getUserInitials(user.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium text-gray-900">{user.name}</div>
-                            <div className="text-sm text-gray-500">{user.email}</div>
-                          </div>
-                        </div>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-64 glass border-white/10 bg-background/95 backdrop-blur-xl"
+                    >
+                      <div className="px-3 py-3 border-b border-white/10">
+                        <p className="font-semibold text-sm">{user.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                       </div>
                       <DropdownMenuItem onClick={() => navigate("/profile")}>
-                        <User className="w-4 h-4 mr-3" />
-                        My Profile
+                        <User className="mr-2 h-4 w-4" /> My Profile
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate("/profile/bookings")}>
-                        <BookOpen className="w-4 h-4 mr-3" />
-                        My Bookings
+                        <BookOpen className="mr-2 h-4 w-4" /> My Bookings
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate("/favorites")}>
-                        <Heart className="w-4 h-4 mr-3" />
-                        Favorites
+                        <Heart className="mr-2 h-4 w-4" /> Favorites
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => navigate("/notifications")}>
+                        <Bell className="mr-2 h-4 w-4" /> Notifications
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator className="bg-white/10" />
                       <DropdownMenuItem onClick={() => navigate("/settings")}>
-                        Settings
+                        <Settings className="mr-2 h-4 w-4" /> Settings
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                        <LogOut className="w-4 h-4 mr-3" />
-                        Sign Out
+                      <DropdownMenuSeparator className="bg-white/10" />
+                      <DropdownMenuItem
+                        onClick={handleLogout}
+                        className="text-red-400 focus:text-red-400"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" /> Sign Out
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
               ) : (
-                <div className="flex items-center space-x-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleAuthClick("login")}
-                    className="hover:text-cricket-green transition-colors"
-                  >
+                <div className="flex items-center gap-2 ml-1">
+                  <Button variant="ghost" size="sm" onClick={() => handleAuthClick("login")}>
                     Login
                   </Button>
-                  <Button
-                    size="sm"
-                    className="bg-cricket-green hover:bg-cricket-green/90 text-white font-semibold px-6"
-                    onClick={() => handleAuthClick("register")}
-                  >
-                    Sign Up
+                  <Button variant="glow" size="sm" onClick={() => handleAuthClick("register")}>
+                    Get Started
                   </Button>
                 </div>
               )}
             </div>
 
-            {/* Mobile Menu Button */}
+            {/* Mobile menu toggle */}
             <Button
-              variant="ghost"
-              size="sm"
-              className={`md:hidden flex items-center justify-center p-3 rounded-full transition-colors shadow-md absolute top-3 right-4 z-[201] ${
-                isMenuOpen 
-                  ? "bg-cricket-green text-white hover:bg-cricket-green/90" 
-                  : "bg-white hover:bg-cricket-green/10 text-cricket-green border border-gray-200"
-              }`}
+              variant="glass"
+              size="icon"
+              className="md:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label="Toggle mobile menu"
+              aria-label="Toggle menu"
             >
-              {isMenuOpen ? (
-                <X className="w-7 h-7" />
-              ) : (
-                <Menu className="w-7 h-7" />
-              )}
+              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
+        </nav>
+      </motion.header>
 
-          {/* Mobile Menu */}
-          {isMenuOpen && (
-            <div className="md:hidden fixed inset-0 z-[200] overflow-y-auto bg-white/95 backdrop-blur-lg shadow-xl">
-              <div className="space-y-6 px-4 py-6 pt-20 max-h-screen overflow-y-auto relative">
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden"
+              onClick={() => setIsMenuOpen(false)}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="fixed right-0 top-0 bottom-0 z-50 w-[min(100vw-3rem,320px)] border-l border-white/10 bg-background/95 backdrop-blur-xl md:hidden overflow-y-auto"
+            >
+              <div className="flex flex-col gap-6 p-6 pt-24">
+                <Button variant="glass" onClick={onCitySelect} className="justify-start gap-3 h-12">
+                  <MapPin className="h-4 w-4 text-emerald" />
+                  {selectedCity || "Select City"}
+                </Button>
 
-                {/* Mobile Location and Filter */}
-                <div className="flex flex-col space-y-3">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={onCitySelect}
-                    className="flex items-center justify-center space-x-3 py-3 h-12"
-                  >
-                    <MapPin className="w-5 h-5" />
-                    <span className="text-base font-medium">
-                      {selectedCity || "Select City"}
-                    </span>
+                <form onSubmit={handleSearch} className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search grounds..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </form>
+
+                {onFilterToggle && (
+                  <Button variant="outline" onClick={onFilterToggle} className="gap-2">
+                    <Filter className="h-4 w-4" /> Filters
                   </Button>
-                  {onFilterToggle && (
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={onFilterToggle}
-                      className="flex items-center justify-center space-x-3 py-3 h-12"
+                )}
+
+                <div className="space-y-1">
+                  {navItems.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
+                        location.pathname === item.path
+                          ? "bg-emerald/10 text-emerald"
+                          : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                      )}
                     >
-                      <Filter className="w-5 h-5" />
-                      <span className="text-base">Filters</span>
-                    </Button>
-                  )}
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </Link>
+                  ))}
                 </div>
 
-                {/* Mobile Auth */}
                 {isAuthenticated && user ? (
-                  <div className="space-y-4 pt-6 border-t border-gray-200">
-                    {/* User Info at Top */}
-                    <div className="flex items-center space-x-4 px-4 py-3 bg-gray-50 rounded-lg">
-                      <Avatar className="w-14 h-14">
+                  <div className="space-y-1 border-t border-white/10 pt-4">
+                    <div className="flex items-center gap-3 px-4 py-3 mb-2">
+                      <Avatar className="h-10 w-10 ring-2 ring-emerald/20">
                         <AvatarImage src={user.avatar} />
-                        <AvatarFallback className="bg-cricket-green text-white font-semibold text-lg">
+                        <AvatarFallback className="bg-emerald text-white text-sm">
                           {getUserInitials(user.name)}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-semibold text-gray-900 text-base">{user.name}</div>
-                        <div className="text-sm text-gray-500">
-                          {user.email}
-                        </div>
+                        <p className="font-semibold text-sm">{user.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                       </div>
                     </div>
-                    
-                    {/* Combined Navigation Items */}
-                    <div className="grid grid-cols-1 gap-2">
-                      {navItems.map((item) => (
-                        <Link
-                          key={item.name}
-                          to={item.path}
-                          className="flex items-center px-4 py-4 text-gray-700 hover:text-cricket-green hover:bg-gray-50 rounded-lg transition-colors duration-200 font-medium text-base shadow-sm border border-gray-100"
-                          onClick={() => setIsMenuOpen(false)}
-                        >
-                          <item.icon className="w-5 h-5 mr-3 text-cricket-green" />
-                          {item.name}
-                        </Link>
-                      ))}
-                    </div>
-
-                    {/* User-specific links */}
-                    <div className="grid grid-cols-1 gap-2">
+                    {[
+                      { label: "Profile", path: "/profile", icon: User },
+                      { label: "Bookings", path: "/profile/bookings", icon: BookOpen },
+                      { label: "Favorites", path: "/favorites", icon: Heart },
+                      { label: "Notifications", path: "/notifications", icon: Bell },
+                      { label: "Settings", path: "/settings", icon: Settings },
+                    ].map((item) => (
                       <Link
-                        to="/profile"
-                        className="flex items-center px-4 py-4 text-gray-700 hover:text-cricket-green hover:bg-gray-50 rounded-lg transition-colors duration-200 text-base shadow-sm border border-gray-100"
-                        onClick={() => setIsMenuOpen(false)}
+                        key={item.path}
+                        to={item.path}
+                        className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-muted-foreground hover:bg-white/5 hover:text-foreground"
                       >
-                        <User className="w-5 h-5 mr-3 text-cricket-green" />
-                        My Profile
+                        <item.icon className="h-4 w-4 text-emerald" />
+                        {item.label}
                       </Link>
-                      <Link
-                        to="/profile/bookings"
-                        className="flex items-center px-4 py-4 text-gray-700 hover:text-cricket-green hover:bg-gray-50 rounded-lg transition-colors duration-200 text-base shadow-sm border border-gray-100"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <BookOpen className="w-5 h-5 mr-3 text-cricket-green" />
-                        My Bookings
-                      </Link>
-                      <Link
-                        to="/favorites"
-                        className="flex items-center px-4 py-4 text-gray-700 hover:text-cricket-green hover:bg-gray-50 rounded-lg transition-colors duration-200 text-base shadow-sm border border-gray-100"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <Heart className="w-5 h-5 mr-3 text-cricket-green" />
-                        Favorites
-                      </Link>
-                      <Link
-                        to="/settings"
-                        className="flex items-center px-4 py-4 text-gray-700 hover:text-cricket-green hover:bg-gray-50 rounded-lg transition-colors duration-200 text-base shadow-sm border border-gray-100"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        <Settings className="w-5 h-5 mr-3 text-cricket-green" />
-                        Settings
-                      </Link>
-                    </div>
-
-                    <div className="border-t border-gray-200 my-2"></div>
-
+                    ))}
                     <button
-                      onClick={() => {
-                        handleLogout();
-                        setIsMenuOpen(false);
-                      }}
-                      className="flex items-center w-full text-left px-4 py-4 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-200 text-base shadow-sm border border-red-100 mt-2"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm text-red-400 hover:bg-red-500/10"
                     >
-                      <LogOut className="w-5 h-5 mr-3 text-red-500" />
+                      <LogOut className="h-4 w-4" />
                       Sign Out
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-3 pt-6 border-t border-gray-200">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="py-3 h-12 text-base shadow-sm border border-gray-200 hover:border-cricket-green/50 hover:text-cricket-green transition-all"
-                      onClick={() => {
-                        handleAuthClick("login");
-                        setIsMenuOpen(false);
-                      }}
-                    >
-                      <User className="w-5 h-5 mr-3 text-cricket-green" />
+                  <div className="flex flex-col gap-2 border-t border-white/10 pt-4">
+                    <Button variant="outline" onClick={() => handleAuthClick("login")}>
                       Login
                     </Button>
-                    <Button
-                      size="lg"
-                      className="py-3 h-12 bg-cricket-green hover:bg-cricket-green/90 text-white font-semibold text-base shadow-sm"
-                      onClick={() => {
-                        handleAuthClick("register");
-                        setIsMenuOpen(false);
-                      }}
-                    >
-                      <User className="w-5 h-5 mr-3 text-white" />
-                      Sign Up
+                    <Button variant="glow" onClick={() => handleAuthClick("register")}>
+                      Get Started
                     </Button>
                   </div>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-      </nav>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
-      {/* Auth Modal */}
+      <div className="h-[88px]" aria-hidden />
+
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}

@@ -1,7 +1,12 @@
 import { Target, Users, Shield, Clock, Star, Award } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
+import PageShell from "@/components/layout/PageShell";
+import { GlassCard } from "@/components/ui/glass-card";
+import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import { staggerContainer, staggerItem } from "@/lib/motion";
 
 const About = () => {
   const features = [
@@ -75,212 +80,142 @@ const About = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
+    <PageShell>
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="py-16 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center space-x-2 bg-cricket-green/10 border border-cricket-green/20 rounded-full px-4 py-2 mb-6">
-            <Target className="w-5 h-5 text-cricket-green" />
-            <span className="text-cricket-green font-medium">
-              About BoxCric
-            </span>
-          </div>
-
-          <h1 className="text-4xl md:text-5xl font-bold font-display text-gray-900 mb-6">
-            Revolutionizing Cricket{" "}
-            <span className="text-transparent bg-gradient-to-r from-cricket-green to-sky-blue bg-clip-text">
-              Ground Booking
-            </span>
+      <section className="section-padding pt-8">
+        <div className="container-premium max-w-4xl mx-auto text-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-emerald/20 bg-emerald/10 px-4 py-1.5 text-xs font-medium text-emerald mb-6">
+            <Target className="h-3.5 w-3.5" />
+            About CricBox
+          </span>
+          <h1 className="heading-display text-4xl md:text-5xl lg:text-6xl text-balance">
+            Revolutionizing{" "}
+            <span className="gradient-text">Cricket Ground Booking</span>
           </h1>
-
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            BoxCric is India's premier platform for discovering and booking
-            cricket grounds. We connect cricket enthusiasts with verified,
-            high-quality box cricket facilities across major cities, making it
-            easier than ever to play the sport you love.
+          <p className="mt-6 text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            CricBox is India's premier platform for discovering and booking cricket grounds.
+            We connect enthusiasts with verified, high-quality box cricket facilities across major cities.
           </p>
         </div>
       </section>
 
-      {/* Mission Section */}
-      <section className="py-16 px-4 bg-white/50">
-        <div className="max-w-6xl mx-auto">
+      <section className="section-padding pt-0">
+        <div className="container-premium">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">
-                Our Mission
-              </h2>
-              <p className="text-gray-600 mb-6 text-lg">
+              <h2 className="heading-display text-3xl mb-6">Our Mission</h2>
+              <p className="text-muted-foreground mb-6 text-lg leading-relaxed">
                 We believe cricket should be accessible to everyone, everywhere.
                 Our mission is to democratize access to quality cricket grounds
-                by connecting players with verified facilities and providing
-                ground owners with a platform to showcase their venues.
+                by connecting players with verified facilities.
               </p>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="w-6 h-6 bg-cricket-green rounded-full flex items-center justify-center mt-1">
-                    <span className="text-white text-sm">✓</span>
+              <div className="space-y-3">
+                {["Make cricket grounds easily discoverable", "Ensure quality and safety standards", "Create a vibrant cricket community"].map((item) => (
+                  <div key={item} className="flex items-center gap-3">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald/20 text-emerald text-xs">✓</div>
+                    <span className="text-foreground/90">{item}</span>
                   </div>
-                  <span className="text-gray-700">
-                    Make cricket grounds easily discoverable
-                  </span>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="w-6 h-6 bg-cricket-green rounded-full flex items-center justify-center mt-1">
-                    <span className="text-white text-sm">✓</span>
-                  </div>
-                  <span className="text-gray-700">
-                    Ensure quality and safety standards
-                  </span>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="w-6 h-6 bg-cricket-green rounded-full flex items-center justify-center mt-1">
-                    <span className="text-white text-sm">✓</span>
-                  </div>
-                  <span className="text-gray-700">
-                    Create a vibrant cricket community
-                  </span>
-                </div>
+                ))}
               </div>
             </div>
-            <div className="relative">
+            <GlassCard className="overflow-hidden p-0">
               <img
                 src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600&h=400&fit=crop"
                 alt="Cricket ground"
-                className="rounded-lg shadow-lg"
+                className="w-full h-64 object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-cricket-green/20 to-transparent rounded-lg"></div>
-            </div>
+            </GlassCard>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 px-4">
-        <div className="max-w-6xl mx-auto">
+      <section className="section-padding">
+        <div className="container-premium">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Why Choose BoxCric?
-            </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              We're committed to providing the best cricket booking experience
-              with features designed for both players and ground owners.
+            <h2 className="heading-display text-3xl mb-4">Why Choose CricBox?</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Features designed for both players and ground owners.
             </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {features.map((feature, index) => (
-              <Card
-                key={index}
-                className="border-0 bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow duration-300"
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start space-x-4">
-                    <div className="flex-shrink-0">{feature.icon}</div>
+              <motion.div key={index} variants={staggerItem}>
+                <GlassCard hover className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald/10">
+                      {feature.icon}
+                    </div>
                     <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        {feature.title}
-                      </h3>
-                      <p className="text-gray-600">{feature.description}</p>
+                      <h3 className="font-display font-semibold text-lg mb-2">{feature.title}</h3>
+                      <p className="text-sm text-muted-foreground">{feature.description}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </GlassCard>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-16 px-4 bg-white/50">
-        <div className="max-w-6xl mx-auto">
+      <section className="section-padding">
+        <div className="container-premium">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              BoxCric by Numbers
-            </h2>
-            <p className="text-gray-600">
-              Growing every day with our amazing cricket community
-            </p>
+            <h2 className="heading-display text-3xl mb-4">CricBox by Numbers</h2>
+            <p className="text-muted-foreground">Growing every day with our cricket community</p>
           </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {stats.map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="w-16 h-16 bg-gradient-cricket rounded-full flex items-center justify-center mx-auto mb-4">
-                  <div className="text-white">{stat.icon}</div>
+              <GlassCard key={index} hover glow className="p-6 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald/10 text-emerald">
+                  {stat.icon}
                 </div>
-                <div className="text-3xl font-bold text-gray-900 mb-2">
-                  {stat.number}
-                </div>
-                <div className="text-gray-600">{stat.label}</div>
-              </div>
+                <div className="font-display text-3xl font-bold gradient-text">{stat.number}</div>
+                <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
+              </GlassCard>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Team Section */}
-      <section className="py-16 px-4">
-        <div className="max-w-6xl mx-auto">
+      <section className="section-padding">
+        <div className="container-premium">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Meet Our Team
-            </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Passionate cricket enthusiasts working to revolutionize how you
-              discover and book cricket grounds.
+            <h2 className="heading-display text-3xl mb-4">Meet Our Team</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Passionate cricket enthusiasts revolutionizing ground booking.
             </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {team.map((member, index) => (
-              <Card
-                key={index}
-                className="border-0 bg-white/80 backdrop-blur-sm text-center"
-              >
-                <CardContent className="p-6">
-                  <img
-                    src={member.image}
-                    alt={member.name}
-                    className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-                  />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                    {member.name}
-                  </h3>
-                  <Badge variant="secondary" className="mb-3">
-                    {member.role}
-                  </Badge>
-                  <p className="text-gray-600 text-sm">{member.bio}</p>
-                </CardContent>
-              </Card>
+              <GlassCard key={index} hover className="p-6 text-center">
+                <img src={member.image} alt={member.name} className="w-20 h-20 rounded-full mx-auto mb-4 object-cover ring-2 ring-emerald/30" />
+                <h3 className="font-display font-semibold text-lg">{member.name}</h3>
+                <Badge className="mt-2 mb-3 bg-emerald/10 text-emerald border-emerald/20">{member.role}</Badge>
+                <p className="text-sm text-muted-foreground">{member.bio}</p>
+              </GlassCard>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-16 px-4 bg-gradient-cricket">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Ready to Join the BoxCric Community?
-          </h2>
-          <p className="text-white/90 mb-8 text-lg">
-            Start exploring cricket grounds in your city and book your next game
-            today.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="bg-white text-cricket-green px-8 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors duration-200">
-              Find Grounds
-            </button>
-            <button className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors duration-200">
-              List Your Ground
-            </button>
-          </div>
+      <section className="section-padding pb-24">
+        <div className="container-premium max-w-3xl">
+          <GlassCard glow className="p-10 text-center">
+            <h2 className="heading-display text-3xl mb-4">Join the CricBox Community</h2>
+            <p className="text-muted-foreground mb-8">
+              Start exploring cricket grounds in your city and book your next game today.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button variant="glow" size="lg" asChild>
+                <Link to="/">Find Grounds</Link>
+              </Button>
+              <Button variant="outline" size="lg">List Your Ground</Button>
+            </div>
+          </GlassCard>
         </div>
       </section>
-    </div>
+    </PageShell>
   );
 };
 

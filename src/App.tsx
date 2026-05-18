@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 import PaymentCallback from "./pages/PaymentCallback";
 import Notifications from "./pages/Notifications";
 import Footer from "./components/Footer";
+import MobileBottomNav from "./components/MobileBottomNav";
 import OwnerPanel from "./pages/OwnerPanel";
 
 const queryClient = new QueryClient({
@@ -54,6 +55,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             <Footer />
+            <MobileBottomNav />
           </BrowserRouter>
         </TooltipProvider>
       </NotificationProvider>

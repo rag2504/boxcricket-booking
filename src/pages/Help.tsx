@@ -43,6 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
+import PageShell from "@/components/layout/PageShell";
 
 const Help = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -532,18 +533,14 @@ const Help = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
+    <PageShell>
       <Navbar />
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
+      <div className="container-premium section-padding max-w-6xl">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Help & Support
-          </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Find answers to your questions or get in touch with our support
-            team. We're here to help you have the best cricket experience.
+          <h1 className="heading-display text-4xl sm:text-5xl mb-4">Help & Support</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Find answers to your questions or get in touch with our support team.
           </p>
         </div>
 
@@ -918,7 +915,7 @@ const Help = () => {
           </Card>
         </section>
       </div>
-    </div>
+    </PageShell>
   );
 };
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   Star,
@@ -11,19 +12,35 @@ import {
   Calendar,
   Heart,
   Share2,
+  ChevronLeft,
+  ChevronRight,
+  Quote,
+  Shield,
+  Phone,
+  Mail,
+  Sparkles,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Navbar from "@/components/Navbar";
+import PageShell from "@/components/layout/PageShell";
 import NewBookingModal from "@/components/NewBookingModal";
+import { GlassCard } from "@/components/ui/glass-card";
+import { PageLoader } from "@/components/ui/page-loader";
 import { groundsApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { isMongoObjectId } from "@/lib/utils";
+import {
+  fadeInUp,
+  staggerContainer,
+  staggerItem,
+  defaultTransition,
+} from "@/lib/motion";
 
 const GroundDetails = () => {
   const { id } = useParams();
@@ -40,7 +57,7 @@ const GroundDetails = () => {
   const [slotRetryCount, setSlotRetryCount] = useState(0);
   const [notifications, setNotifications] = useState<any[]>(() => {
     try {
-      const saved = localStorage.getItem('boxcric_notifications');
+      const saved = localStorage.getItem("boxcric_notifications");
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -49,9 +66,8 @@ const GroundDetails = () => {
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
   useEffect(() => {
-    // Scroll to top when component mounts or ID changes
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
     if (id && !isMongoObjectId(id)) {
       toast.error("This ground cannot be booked online.");
       navigate("/");
@@ -63,27 +79,23 @@ const GroundDetails = () => {
     }
   }, [id]);
 
-  // Sync notifications from localStorage
   useEffect(() => {
     const handleStorageChange = () => {
       try {
-        const saved = localStorage.getItem('boxcric_notifications');
+        const saved = localStorage.getItem("boxcric_notifications");
         if (saved) {
           setNotifications(JSON.parse(saved));
         }
       } catch (error) {
-        console.error('Error syncing notifications:', error);
+        console.error("Error syncing notifications:", error);
       }
     };
 
-    // Listen for storage changes
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also check on mount
+    window.addEventListener("storage", handleStorageChange);
     handleStorageChange();
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener("storage", handleStorageChange);
     };
   }, []);
 
@@ -91,14 +103,14 @@ const GroundDetails = () => {
     try {
       setIsLoading(true);
       console.log("Fetching ground details for ID:", id);
-      
+
       if (!id || id === "undefined") {
         throw new Error("Invalid ground ID");
       }
-      
+
       const response = await groundsApi.getGround(id);
       console.log("Ground details response:", response);
-      
+
       //@ts-ignore
       if (response.success) {
         //@ts-ignore
@@ -120,7 +132,7 @@ const GroundDetails = () => {
     try {
       const response = await groundsApi.getReviews(id!, { limit: 5 });
       console.log("Reviews response:", response);
-      
+
       //@ts-ignore
       if (response.success) {
         //@ts-ignore
@@ -133,34 +145,37 @@ const GroundDetails = () => {
 
   const handleBookingCreated = (booking: any) => {
     toast.success("Booking created successfully!");
-    
-    // Add notification for new booking
+
     const newNotification = {
       id: booking._id || booking.id || Date.now().toString(),
-      status: booking.status || 'pending',
-      ground: booking.groundId?.name || ground?.name || 'Unknown Ground',
+      status: booking.status || "pending",
+      ground: booking.groundId?.name || ground?.name || "Unknown Ground",
       date: booking.bookingDate,
-      time: booking.timeSlot ? `${booking.timeSlot.startTime} - ${booking.timeSlot.endTime}` : 'Time not specified',
-      reason: '',
+      time: booking.timeSlot
+        ? `${booking.timeSlot.startTime} - ${booking.timeSlot.endTime}`
+        : "Time not specified",
+      reason: "",
       createdAt: new Date().toISOString(),
       isLocal: true,
     };
-    
-    // Store notification in localStorage for the Index page to pick up
-    const existingNotifications = JSON.parse(localStorage.getItem('boxcric_notifications') || '[]');
+
+    const existingNotifications = JSON.parse(
+      localStorage.getItem("boxcric_notifications") || "[]",
+    );
     const updatedNotifications = [newNotification, ...existingNotifications];
-    localStorage.setItem('boxcric_notifications', JSON.stringify(updatedNotifications));
-    
+    localStorage.setItem(
+      "boxcric_notifications",
+      JSON.stringify(updatedNotifications),
+    );
+
     navigate(`/booking/${booking._id}`);
   };
 
-  // Clear all notifications
   const clearNotifications = () => {
     setNotifications([]);
-    localStorage.removeItem('boxcric_notifications');
+    localStorage.removeItem("boxcric_notifications");
   };
 
-  // Check if ground is in favorites on mount
   useEffect(() => {
     if (ground && isAuthenticated) {
       checkIfFavorite();
@@ -169,63 +184,78 @@ const GroundDetails = () => {
 
   const checkIfFavorite = () => {
     try {
-      const favorites = JSON.parse(localStorage.getItem('boxcric_favorites') || '[]');
+      const favorites = JSON.parse(
+        localStorage.getItem("boxcric_favorites") || "[]",
+      );
       const isInFavorites = favorites.some((fav: any) => fav._id === ground._id);
       setIsFavorite(isInFavorites);
     } catch (error) {
-      console.error('Error checking favorites:', error);
+      console.error("Error checking favorites:", error);
     }
   };
 
   const handleToggleFavorite = () => {
     if (!isAuthenticated) {
-      toast.error('Please login to add favorites');
+      toast.error("Please login to add favorites");
       return;
     }
 
     try {
-      const favorites = JSON.parse(localStorage.getItem('boxcric_favorites') || '[]');
-      
+      const favorites = JSON.parse(
+        localStorage.getItem("boxcric_favorites") || "[]",
+      );
+
       if (isFavorite) {
-        // Remove from favorites
-        const updatedFavorites = favorites.filter((fav: any) => fav._id !== ground._id);
-        localStorage.setItem('boxcric_favorites', JSON.stringify(updatedFavorites));
+        const updatedFavorites = favorites.filter(
+          (fav: any) => fav._id !== ground._id,
+        );
+        localStorage.setItem(
+          "boxcric_favorites",
+          JSON.stringify(updatedFavorites),
+        );
         setIsFavorite(false);
-        toast.success('Removed from favorites');
-        
-        // Dispatch custom event to notify other components
-        window.dispatchEvent(new CustomEvent('favoritesChanged'));
+        toast.success("Removed from favorites");
+
+        window.dispatchEvent(new CustomEvent("favoritesChanged"));
       } else {
-        // Add to favorites
         const groundToSave = {
           _id: safeGround._id,
           name: safeGround.name,
           location: safeGround.location,
           price: {
-            perHour: Array.isArray(safeGround.price?.ranges) && safeGround.price.ranges.length > 0
-              ? Math.round(safeGround.price.ranges.reduce((sum: number, range: any) => sum + range.perHour, 0) / safeGround.price.ranges.length)
-              : safeGround.price?.perHour || 0
+            perHour:
+              Array.isArray(safeGround.price?.ranges) &&
+              safeGround.price.ranges.length > 0
+                ? Math.round(
+                    safeGround.price.ranges.reduce(
+                      (sum: number, range: any) => sum + range.perHour,
+                      0,
+                    ) / safeGround.price.ranges.length,
+                  )
+                : safeGround.price?.perHour || 0,
           },
           rating: safeGround.rating,
           features: safeGround.features,
           images: safeGround.images,
           availability: {
             isAvailable: true,
-            nextSlot: 'Available now'
-          }
+            nextSlot: "Available now",
+          },
         };
-        
+
         const updatedFavorites = [...favorites, groundToSave];
-        localStorage.setItem('boxcric_favorites', JSON.stringify(updatedFavorites));
+        localStorage.setItem(
+          "boxcric_favorites",
+          JSON.stringify(updatedFavorites),
+        );
         setIsFavorite(true);
-        toast.success('Added to favorites');
-        
-        // Dispatch custom event to notify other components
-        window.dispatchEvent(new CustomEvent('favoritesChanged'));
+        toast.success("Added to favorites");
+
+        window.dispatchEvent(new CustomEvent("favoritesChanged"));
       }
     } catch (error) {
-      console.error('Error managing favorites:', error);
-      toast.error('Failed to update favorites');
+      console.error("Error managing favorites:", error);
+      toast.error("Failed to update favorites");
     }
   };
 
@@ -254,8 +284,8 @@ const GroundDetails = () => {
 
   const getAmenityIcon = (amenity: string) => {
     const iconMap: Record<string, React.ReactNode> = {
-      Floodlights: <Zap className="w-4 h-4" />,
-      Parking: <Car className="w-4 h-4" />,
+      Floodlights: <Zap className="w-4 h-4 text-emerald" />,
+      Parking: <Car className="w-4 h-4 text-emerald" />,
       Washroom: <span>🚿</span>,
       "Changing Room": <span>👕</span>,
       "AC Changing Room": <span>❄️👕</span>,
@@ -266,52 +296,47 @@ const GroundDetails = () => {
       Scoreboard: <span>📊</span>,
       Referee: <span>👨‍⚖️</span>,
     };
-    return iconMap[amenity] || <span>✨</span>;
+    return iconMap[amenity] || <Sparkles className="w-4 h-4 text-emerald/70" />;
+  };
+
+  const navbarProps = {
+    notifications,
+    showNotifDropdown,
+    setShowNotifDropdown,
+    clearNotifications,
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
-        <Navbar 
-          notifications={notifications}
-          showNotifDropdown={showNotifDropdown}
-          setShowNotifDropdown={setShowNotifDropdown}
-          clearNotifications={clearNotifications}
-        />
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="w-8 h-8 border-4 border-cricket-green border-t-transparent rounded-full animate-spin" />
-          </div>
-        </div>
-      </div>
+      <PageShell>
+        <Navbar {...navbarProps} />
+        <PageLoader message="Loading ground" submessage="Fetching details..." />
+      </PageShell>
     );
   }
 
   if (!ground) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
-        <Navbar 
-          notifications={notifications}
-          showNotifDropdown={showNotifDropdown}
-          setShowNotifDropdown={setShowNotifDropdown}
-          clearNotifications={clearNotifications}
-        />
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              Ground Not Found
-            </h1>
-            <Button onClick={() => navigate("/")}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Home
-            </Button>
-          </div>
-        </div>
-      </div>
+      <PageShell>
+        <Navbar {...navbarProps} />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="container-premium px-4 py-24 text-center"
+        >
+          <h1 className="heading-display text-2xl mb-4">Ground Not Found</h1>
+          <p className="text-muted-foreground mb-8">
+            This ground may have been removed or is unavailable.
+          </p>
+          <Button variant="glow" onClick={() => navigate("/")}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Button>
+        </motion.div>
+      </PageShell>
     );
   }
 
-  // Ensure ground has required properties with fallbacks
   const safeGround = {
     _id: ground._id || id || "unknown",
     name: ground.name || "Unknown Ground",
@@ -320,470 +345,737 @@ const GroundDetails = () => {
     price: ground.price || { perHour: 0, discount: 0 },
     images: ground.images || [],
     amenities: ground.amenities || [],
-    features: ground.features || { pitchType: "Unknown", capacity: 0, lighting: false, parking: false },
+    features: ground.features || {
+      pitchType: "Unknown",
+      capacity: 0,
+      lighting: false,
+      parking: false,
+    },
     rating: ground.rating || { average: 0, count: 0 },
-    owner: ground.owner || { name: "Unknown", contact: "N/A", email: "N/A", verified: false },
+    owner: ground.owner || {
+      name: "Unknown",
+      contact: "N/A",
+      email: "N/A",
+      verified: false,
+    },
     totalBookings: ground.totalBookings || 0,
     isVerified: ground.isVerified || false,
     policies: ground.policies || { cancellation: "Standard policy", rules: [] },
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
-      <Navbar 
-        notifications={notifications}
-        showNotifDropdown={showNotifDropdown}
-        setShowNotifDropdown={setShowNotifDropdown}
-        clearNotifications={clearNotifications}
-      />
+  const currentImage =
+    safeGround.images[currentImageIndex]?.url ||
+    safeGround.images[currentImageIndex] ||
+    "/placeholder.svg";
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+  const minPrice =
+    Array.isArray(safeGround.price?.ranges) && safeGround.price.ranges.length > 0
+      ? Math.min(...safeGround.price.ranges.map((r: any) => r.perHour))
+      : null;
+
+  return (
+    <PageShell>
+      <Navbar {...navbarProps} />
+
+      {/* Top bar */}
+      <div className="container-premium px-4 sm:px-6 pt-6">
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={defaultTransition}
+          className="flex items-center justify-between gap-4"
+        >
           <Button
             variant="ghost"
             onClick={() => navigate("/")}
-            className="flex items-center space-x-2"
+            className="text-muted-foreground hover:text-foreground gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Search</span>
+            <span className="hidden sm:inline">Back to Search</span>
           </Button>
 
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleToggleFavorite}
-            >
+          <motion.div
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...defaultTransition, delay: 0.1 }}
+            className="flex items-center gap-2"
+          >
+            <Button variant="glass" size="sm" onClick={handleToggleFavorite}>
               <Heart
                 className={cn(
-                  "w-4 h-4 mr-2",
+                  "w-4 h-4",
                   isFavorite && "fill-red-500 text-red-500",
                 )}
               />
-              {isFavorite ? "Saved" : "Save"}
+              <span className="hidden sm:inline">
+                {isFavorite ? "Saved" : "Save"}
+              </span>
             </Button>
-            <Button variant="outline" size="sm">
-              <Share2 className="w-4 h-4 mr-2" />
-              Share
+            <Button variant="glass" size="sm">
+              <Share2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Share</span>
             </Button>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Image Gallery */}
-            <div className="relative">
-              <div className="aspect-video rounded-lg overflow-hidden">
-                <img
-                  src={
-                    safeGround.images[currentImageIndex]?.url || 
-                    safeGround.images[currentImageIndex] || 
-                    "/placeholder.svg"
-                  }
-                  alt={safeGround.name}
-                  className="w-full h-full object-cover"
-                />
+      {/* Image gallery */}
+      <motion.section
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6 }}
+        className="container-premium px-4 sm:px-6 mt-6"
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="relative overflow-hidden rounded-2xl sm:rounded-3xl aspect-[16/9] sm:aspect-[21/9] group"
+        >
+          <AnimatePresence mode="wait">
+            <motion.img
+              key={currentImageIndex}
+              src={currentImage}
+              alt={safeGround.name}
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.45 }}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          </AnimatePresence>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent pointer-events-none"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/40 via-transparent to-transparent pointer-events-none" />
+
+          {safeGround.images.length > 1 && (
+            <>
+              <button
+                onClick={() => handleImageNavigation("prev")}
+                className="absolute left-4 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full glass border-white/10 text-foreground opacity-0 transition-all group-hover:opacity-100 hover:bg-white/10 hover:scale-105"
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => handleImageNavigation("next")}
+                className="absolute right-4 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full glass border-white/10 text-foreground opacity-0 transition-all group-hover:opacity-100 hover:bg-white/10 hover:scale-105"
+                aria-label="Next image"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 px-3 py-2 rounded-full glass border-white/10">
+                {safeGround.images.map((_: any, index: number) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentImageIndex(index)}
+                    className={cn(
+                      "h-2 rounded-full transition-all duration-300",
+                      index === currentImageIndex
+                        ? "w-6 bg-emerald"
+                        : "w-2 bg-white/40 hover:bg-white/60",
+                    )}
+                    aria-label={`Go to image ${index + 1}`}
+                  />
+                ))}
               </div>
+            </>
+          )}
 
-              {/* Image Navigation */}
-              {safeGround.images.length > 1 && (
-                <>
-                  <button
-                    onClick={() => handleImageNavigation("prev")}
-                    className="absolute left-4 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    onClick={() => handleImageNavigation("next")}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
-                  >
-                    ›
-                  </button>
-
-                  {/* Image Indicators */}
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-                    {safeGround.images.map((_: any, index: number) => (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentImageIndex(index)}
-                        className={cn(
-                          "w-3 h-3 rounded-full transition-all",
-                          index === currentImageIndex
-                            ? "bg-white"
-                            : "bg-white/50",
-                        )}
-                      />
-                    ))}
-                  </div>
-                </>
+          <GlassCard className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-auto sm:max-w-lg p-4 sm:p-5 !rounded-xl border-white/10 bg-black/40 backdrop-blur-2xl pointer-events-none">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              {safeGround.isVerified && (
+                <Badge className="bg-emerald/20 text-emerald border-emerald/30 pointer-events-auto">
+                  <Shield className="w-3 h-3 mr-1" />
+                  Verified
+                </Badge>
               )}
+              <div className="flex items-center gap-1 text-amber-400">
+                <Star className="w-4 h-4 fill-current" />
+                <span className="font-semibold text-foreground">
+                  {safeGround.rating.average}
+                </span>
+                <span className="text-muted-foreground text-sm">
+                  ({safeGround.rating.count} reviews)
+                </span>
+              </div>
             </div>
+            <h1 className="heading-display text-xl sm:text-2xl line-clamp-2">
+              {safeGround.name}
+            </h1>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground"
+            >
+              <MapPin className="w-4 h-4 shrink-0 text-emerald" />
+              <span className="line-clamp-1">{safeGround.location.address}</span>
+              {ground.distance && (
+                <span className="text-emerald font-medium shrink-0">
+                  • {ground.distance.toFixed(1)} km
+                </span>
+              )}
+            </motion.div>
+          </GlassCard>
+        </motion.div>
 
-            {/* Ground Info */}
-            <div>
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    {safeGround.name}
-                  </h1>
-                  <div className="flex items-center space-x-1 text-gray-600 mb-3">
-                    <MapPin className="w-5 h-5" />
-                    <span>{safeGround.location.address}</span>
-                    {ground.distance && (
-                      <span className="text-cricket-green font-medium">
-                        • {ground.distance.toFixed(1)} km away
+        {safeGround.images.length > 1 && (
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="flex gap-2 mt-3 overflow-x-auto scrollbar-hide pb-1"
+          >
+            {safeGround.images.map((img: any, index: number) => {
+              const thumb = img?.url || img;
+              return (
+                <motion.button
+                  key={index}
+                  variants={staggerItem}
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={cn(
+                    "relative shrink-0 h-16 w-24 sm:h-20 sm:w-28 rounded-xl overflow-hidden border-2 transition-all duration-300",
+                    index === currentImageIndex
+                      ? "border-emerald shadow-glow-sm"
+                      : "border-white/10 opacity-60 hover:opacity-100",
+                  )}
+                >
+                  <img
+                    src={thumb || "/placeholder.svg"}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        )}
+      </motion.section>
+
+      {/* Main layout */}
+      <motion.div
+        variants={fadeInUp}
+        initial="hidden"
+        animate="visible"
+        transition={{ ...defaultTransition, delay: 0.15 }}
+        className="container-premium px-4 sm:px-6 py-8 lg:py-10"
+      >
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10"
+        >
+          {/* Main column */}
+          <div className="lg:col-span-2 space-y-8">
+            <motion.div variants={staggerItem}>
+              <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                <motion.div variants={staggerItem} className="flex-1 min-w-0">
+                  {minPrice !== null ? (
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-display font-bold gradient-text">
+                        ₹{minPrice}
                       </span>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-1">
-                      <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                      <span className="font-semibold">
-                        {safeGround.rating.average}
-                      </span>
-                      <span className="text-gray-600">
-                        ({safeGround.rating.count} reviews)
-                      </span>
-                    </div>
-                    {safeGround.isVerified && (
-                      <Badge className="bg-cricket-green text-white">
-                        Verified
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right">
-                  {Array.isArray(safeGround.price?.ranges) && safeGround.price.ranges.length > 0 ? (
-                    <div className="space-y-2">
-                      <div className="text-lg font-bold text-cricket-green">
-                        Starting from ₹{Math.min(...safeGround.price.ranges.map(r => r.perHour))}/hr
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        View all pricing options below
-                      </div>
+                      <span className="text-muted-foreground">/hr starting</span>
                     </div>
                   ) : (
-                    <div className="text-base text-gray-500">No price slots set</div>
+                    <p className="text-muted-foreground">No price slots set</p>
                   )}
                   {safeGround.price.discount > 0 && (
-                    <div className="text-sm text-green-600">
-                      {safeGround.price.discount}% discount available
-                    </div>
+                    <p className="text-emerald text-sm mt-1 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {safeGround.price.discount}% discount on advance bookings
+                    </p>
                   )}
-                </div>
+                </motion.div>
               </div>
-
-              <p className="text-gray-700 leading-relaxed">
+              <p className="text-muted-foreground leading-relaxed">
                 {safeGround.description}
               </p>
-            </div>
+            </motion.div>
 
-            {/* Pricing Section */}
-            {Array.isArray(safeGround.price?.ranges) && safeGround.price.ranges.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <span>💰</span>
-                    <span>Pricing Options</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {safeGround.price.ranges.map((range, index) => (
-                      <div key={index} className="border rounded-lg p-4 bg-gradient-to-r from-green-50 to-blue-50">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold text-gray-700">
-                            {range.start} - {range.end}
-                          </span>
-                          <Badge variant="outline" className="text-cricket-green border-cricket-green">
-                            {index === 0 ? 'Peak Hours' : 'Off-Peak Hours'}
-                          </Badge>
-                        </div>
-                        <div className="text-2xl font-bold text-cricket-green">
-                          ₹{range.perHour}/hr
-                        </div>
-                        <div className="text-sm text-gray-600 mt-1">
-                          {range.start === '06:00' && range.end === '18:00' ? 'Day time slots' : 'Evening/Night slots'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {safeGround.price.discount > 0 && (
-                    <div className="mt-4 p-3 bg-green-100 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-green-600">🎉</span>
-                        <span className="font-medium text-green-800">
-                          {safeGround.price.discount}% discount available on advance bookings
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Details Tabs */}
-            <Tabs defaultValue="amenities" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="amenities">Amenities</TabsTrigger>
-                <TabsTrigger value="features">Features</TabsTrigger>
-                <TabsTrigger value="policies">Policies</TabsTrigger>
-                <TabsTrigger value="reviews">Reviews</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="amenities" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Available Amenities</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {safeGround.amenities.map(
-                        (amenity: string, index: number) => (
-                          <div
-                            key={index}
-                            className="flex items-center space-x-2 p-2 bg-gray-50 rounded-lg"
-                          >
-                            {getAmenityIcon(amenity)}
-                            <span className="text-sm">{amenity}</span>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="features" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Ground Features</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+            {Array.isArray(safeGround.price?.ranges) &&
+              safeGround.price.ranges.length > 0 && (
+                <motion.div variants={staggerItem}>
+                  <GlassCard className="p-6">
+                    <h2 className="heading-display text-lg mb-4 flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-emerald" />
+                      Pricing Options
+                    </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-gray-600">Pitch Type:</span>
-                        <div className="font-medium">
-                          {safeGround.features.pitchType}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Capacity:</span>
-                        <div className="font-medium">
-                          {safeGround.features.capacity} players
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Night Lighting:</span>
-                        <div className="font-medium">
-                          {safeGround.features.lighting
-                            ? "Available"
-                            : "Not available"}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Parking:</span>
-                        <div className="font-medium">
-                          {safeGround.features.parking
-                            ? "Available"
-                            : "Not available"}
-                        </div>
-                      </div>
+                      {safeGround.price.ranges.map((range: any, index: number) => (
+                        <motion.div
+                          key={index}
+                          whileHover={{ y: -2 }}
+                          className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 transition-colors hover:border-emerald/20"
+                        >
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: index * 0.08 }}
+                            className="flex items-center justify-between mb-2"
+                          >
+                            <span className="font-medium text-foreground">
+                              {range.start} – {range.end}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="border-emerald/30 text-emerald text-xs"
+                            >
+                              {index === 0 ? "Peak" : "Off-Peak"}
+                            </Badge>
+                          </motion.div>
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: index * 0.08 }}
+                            className="text-2xl font-display font-bold text-emerald"
+                          >
+                            ₹{range.perHour}/hr
+                          </motion.div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {range.start === "06:00" && range.end === "18:00"
+                              ? "Day time slots"
+                              : "Evening / night slots"}
+                          </p>
+                        </motion.div>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                    {safeGround.price.discount > 0 && (
+                      <div className="mt-4 rounded-xl bg-emerald/10 border border-emerald/20 p-3 flex items-center gap-2 text-sm text-emerald">
+                        <Sparkles className="w-4 h-4 shrink-0" />
+                        {safeGround.price.discount}% discount on advance bookings
+                      </div>
+                    )}
+                  </GlassCard>
+                </motion.div>
+              )}
 
-              <TabsContent value="policies" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Booking Policies</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+            <motion.div variants={staggerItem}>
+              <Tabs defaultValue="amenities" className="space-y-4">
+                <TabsList className="glass w-full sm:w-auto h-auto flex-wrap gap-1 p-1.5 rounded-xl">
+                  <TabsTrigger
+                    value="amenities"
+                    className="rounded-lg data-[state=active]:bg-emerald/20 data-[state=active]:text-emerald"
+                  >
+                    Amenities
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="features"
+                    className="rounded-lg data-[state=active]:bg-emerald/20 data-[state=active]:text-emerald"
+                  >
+                    Features
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="policies"
+                    className="rounded-lg data-[state=active]:bg-emerald/20 data-[state=active]:text-emerald"
+                  >
+                    Policies
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="reviews"
+                    className="rounded-lg data-[state=active]:bg-emerald/20 data-[state=active]:text-emerald"
+                  >
+                    Reviews
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="amenities">
+                  <GlassCard className="p-6">
+                    <h3 className="heading-display text-lg mb-4">
+                      Available Amenities
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {safeGround.amenities.map((amenity: string, index: number) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, y: 8 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: index * 0.04 }}
+                          className="flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-sm"
+                        >
+                          {getAmenityIcon(amenity)}
+                          <span>{amenity}</span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </GlassCard>
+                </TabsContent>
+
+                <TabsContent value="features">
+                  <GlassCard className="p-6">
+                    <h3 className="heading-display text-lg mb-4">Ground Features</h3>
+                    <motion.div
+                      variants={staggerContainer}
+                      initial="hidden"
+                      whileInView="visible"
+                      viewport={{ once: true }}
+                      className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                    >
+                      {[
+                        {
+                          label: "Pitch Type",
+                          value: safeGround.features.pitchType,
+                        },
+                        {
+                          label: "Capacity",
+                          value: `${safeGround.features.capacity} players`,
+                          icon: <Users className="w-4 h-4 text-emerald" />,
+                        },
+                        {
+                          label: "Night Lighting",
+                          value: safeGround.features.lighting
+                            ? "Available"
+                            : "Not available",
+                          icon: <Zap className="w-4 h-4 text-emerald" />,
+                        },
+                        {
+                          label: "Parking",
+                          value: safeGround.features.parking
+                            ? "Available"
+                            : "Not available",
+                          icon: <Car className="w-4 h-4 text-emerald" />,
+                        },
+                      ].map((item, i) => (
+                        <motion.div
+                          key={item.label}
+                          variants={staggerItem}
+                          className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4"
+                        >
+                          <span className="text-xs text-muted-foreground uppercase tracking-wider">
+                            {item.label}
+                          </span>
+                          <div className="flex items-center gap-2 mt-1 font-medium">
+                            {item.icon}
+                            {item.value}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </GlassCard>
+                </TabsContent>
+
+                <TabsContent value="policies">
+                  <GlassCard className="p-6 space-y-6">
                     <div>
-                      <h4 className="font-medium mb-2">Cancellation Policy</h4>
-                      <p className="text-gray-700 text-sm">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-emerald" />
+                        Cancellation Policy
+                      </h4>
+                      <p className="text-muted-foreground text-sm leading-relaxed">
                         {safeGround.policies.cancellation}
                       </p>
                     </div>
-                    <div>
-                      <h4 className="font-medium mb-2">Ground Rules</h4>
-                      <ul className="text-gray-700 text-sm space-y-1">
+                    <Separator className="bg-white/10" />
+                    <motion.div>
+                      <h4 className="font-semibold mb-3">Ground Rules</h4>
+                      <ul className="space-y-2">
                         {safeGround.policies.rules.map(
                           (rule: string, index: number) => (
-                            <li
+                            <motion.li
                               key={index}
-                              className="flex items-start space-x-2"
+                              initial={{ opacity: 0, x: -8 }}
+                              whileInView={{ opacity: 1, x: 0 }}
+                              viewport={{ once: true }}
+                              transition={{ delay: index * 0.05 }}
+                              className="flex items-start gap-2 text-sm text-muted-foreground"
                             >
-                              <span className="text-cricket-green">•</span>
+                              <CheckCircle2 className="w-4 h-4 text-emerald shrink-0 mt-0.5" />
                               <span>{rule}</span>
-                            </li>
+                            </motion.li>
                           ),
                         )}
                       </ul>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                    </motion.div>
+                  </GlassCard>
+                </TabsContent>
 
-              <TabsContent value="reviews" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Customer Reviews</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {reviews.length > 0 ? (
-                      <div className="space-y-4">
-                        {reviews.map((review, index) => (
-                          <div
-                            key={index}
-                            className="border-b pb-4 last:border-b-0"
-                          >
-                            <div className="flex items-center space-x-2 mb-2">
-                              <div className="flex">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    className={cn(
-                                      "w-4 h-4",
-                                      i < review.rating
-                                        ? "fill-yellow-400 text-yellow-400"
-                                        : "text-gray-300",
-                                    )}
-                                  />
-                                ))}
-                              </div>
-                              <span className="font-medium">
-                                {review.userId?.name || "Anonymous"}
-                              </span>
-                              <span className="text-sm text-gray-600">
-                                {new Date(
-                                  review.createdAt,
-                                ).toLocaleDateString()}
-                              </span>
-                            </div>
-                            {review.comment && (
-                              <p className="text-gray-700 text-sm">
-                                {review.comment}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-600 text-center py-8">
-                        No reviews yet. Be the first to review!
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                <TabsContent value="reviews">
+                  <ReviewsSection reviews={reviews} />
+                </TabsContent>
+              </Tabs>
+            </motion.div>
+
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Booking Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Calendar className="w-5 h-5 text-cricket-green" />
-                  <span>Book This Ground</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-center">
-                  {Array.isArray(safeGround.price?.ranges) && safeGround.price.ranges.length > 0 ? (
-                    <>
-                      <div className="space-y-1 mb-2">
-                        {safeGround.price.ranges.map((range, idx) => (
-                          <div key={idx} className="text-base font-semibold text-cricket-green">
-                            {range.start} - {range.end}: ₹{range.perHour}/hr
-                          </div>
-                        ))}
+          {/* Sticky sidebar */}
+          <motion.aside variants={staggerItem} className="space-y-6">
+            <div className="lg:sticky lg:top-24 space-y-6">
+              <GlassCard glow className="p-6 overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+                <h2 className="heading-display text-lg mb-4 flex items-center gap-2 relative">
+                  <Calendar className="w-5 h-5 text-emerald" />
+                  Book This Ground
+                </h2>
+
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-3 mb-6 relative"
+                >
+                  {Array.isArray(safeGround.price?.ranges) &&
+                  safeGround.price.ranges.length > 0 ? (
+                    safeGround.price.ranges.map((range: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between items-center text-sm rounded-lg bg-white/[0.03] px-3 py-2 border border-white/[0.06]"
+                      >
+                        <span className="text-muted-foreground">
+                          {range.start} – {range.end}
+                        </span>
+                        <span className="font-semibold text-emerald">
+                          ₹{range.perHour}/hr
+                        </span>
                       </div>
-                    </>
+                    ))
                   ) : (
-                    <div className="text-base text-gray-500">No price slots set</div>
+                    <p className="text-muted-foreground text-sm text-center py-2">
+                      No price slots set
+                    </p>
                   )}
-                </div>
+                </motion.div>
 
                 <Button
+                  variant="glow"
+                  size="lg"
                   onClick={() => setIsBookingModalOpen(true)}
-                  className="w-full bg-cricket-green hover:bg-cricket-green/90"
+                  className="w-full relative"
                   disabled={!isAuthenticated}
                 >
                   {isAuthenticated ? "Book Now" : "Login to Book"}
                 </Button>
 
-                <div className="text-xs text-gray-600 text-center">
+                <p className="text-xs text-muted-foreground text-center mt-4">
                   Free cancellation up to 4 hours before booking
-                </div>
-              </CardContent>
-            </Card>
+                </p>
+              </GlassCard>
 
-            {/* Contact Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact Ground Owner</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <span className="text-gray-600">Owner:</span>
-                  <div className="font-medium">{safeGround.owner.name}</div>
+              <GlassCard className="p-6">
+                <h3 className="heading-display text-base mb-4">
+                  Contact Ground Owner
+                </h3>
+                <div className="space-y-4 text-sm">
+                  <motion.div
+                    initial={{ opacity: 0, x: 8 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    className="flex items-start gap-3"
+                  >
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald/10">
+                      <Users className="w-4 h-4 text-emerald" />
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground text-xs">Owner</span>
+                      <p className="font-medium">{safeGround.owner.name}</p>
+                    </div>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, x: 8 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.05 }}
+                    className="flex items-start gap-3"
+                  >
+                    <motion.div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald/10">
+                      <Phone className="w-4 h-4 text-emerald" />
+                    </motion.div>
+                    <div>
+                      <span className="text-muted-foreground text-xs">Phone</span>
+                      <p className="font-medium">{safeGround.owner.contact}</p>
+                    </div>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, x: 8 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.15 }}
+                    className="flex items-start gap-3"
+                  >
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald/10">
+                      <Mail className="w-4 h-4 text-emerald" />
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground text-xs">Email</span>
+                      <p className="font-medium break-all">{safeGround.owner.email}</p>
+                    </div>
+                  </motion.div>
+                  {safeGround.owner.verified && (
+                    <Badge className="bg-emerald/15 text-emerald border-emerald/25">
+                      <CheckCircle2 className="w-3 h-3 mr-1" />
+                      Verified Owner
+                    </Badge>
+                  )}
                 </div>
-                <div>
-                  <span className="text-gray-600">Phone:</span>
-                  <div className="font-medium">{safeGround.owner.contact}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Email:</span>
-                  <div className="font-medium">{safeGround.owner.email}</div>
-                </div>
-                {safeGround.owner.verified && (
-                  <Badge className="bg-green-100 text-green-800">
-                    Verified Owner
-                  </Badge>
-                )}
-              </CardContent>
-            </Card>
+              </GlassCard>
 
-            {/* Quick Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Stats</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Bookings:</span>
-                  <span className="font-medium">{safeGround.totalBookings}</span>
+              <GlassCard className="p-6">
+                <h3 className="heading-display text-base mb-4">Quick Stats</h3>
+                <div className="space-y-3 text-sm">
+                  {[
+                    {
+                      label: "Total Bookings",
+                      value: safeGround.totalBookings,
+                    },
+                    {
+                      label: "Average Rating",
+                      value: `${safeGround.rating.average}/5`,
+                    },
+                    { label: "Response Rate", value: "98%", highlight: true },
+                  ].map((stat, i) => (
+                    <motion.div
+                      key={stat.label}
+                      initial={{ opacity: 0 }}
+                      whileInView={{ opacity: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: i * 0.06 }}
+                      className="flex justify-between items-center py-2 border-b border-white/[0.06] last:border-0"
+                    >
+                      <span className="text-muted-foreground">{stat.label}</span>
+                      <span
+                        className={cn(
+                          "font-semibold",
+                          stat.highlight && "text-emerald",
+                        )}
+                      >
+                        {stat.value}
+                      </span>
+                    </motion.div>
+                  ))}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Average Rating:</span>
-                  <span className="font-medium">{safeGround.rating.average}/5</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Response Rate:</span>
-                  <span className="font-medium text-green-600">98%</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
+              </GlassCard>
+            </div>
+          </motion.aside>
+        </motion.div>
 
-      {/* Booking Modal */}
+        {/* Desktop premium reviews block */}
+        <motion.section
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={defaultTransition}
+          className="hidden lg:block mt-12"
+        >
+          <ReviewsSection reviews={reviews} title="Player Reviews" />
+        </motion.section>
+      </motion.div>
+
       <NewBookingModal
         isOpen={isBookingModalOpen}
         onClose={() => setIsBookingModalOpen(false)}
         ground={safeGround}
         onBookingCreated={handleBookingCreated}
       />
-    </div>
+    </PageShell>
   );
 };
+
+function ReviewsSection({
+  reviews,
+  title = "Customer Reviews",
+}: {
+  reviews: any[];
+  title?: string;
+}) {
+  const avgRating =
+    reviews.length > 0
+      ? (
+          reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
+        ).toFixed(1)
+      : null;
+
+  return (
+    <div>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="flex items-end justify-between mb-6"
+      >
+        <motion.div>
+          <h3 className="heading-display text-xl sm:text-2xl">{title}</h3>
+          <p className="text-muted-foreground text-sm mt-1">
+            {reviews.length > 0
+              ? `${reviews.length} recent review${reviews.length !== 1 ? "s" : ""}`
+              : "Be the first to share your experience"}
+          </p>
+        </motion.div>
+        {avgRating && (
+          <GlassCard className="px-4 py-2 flex items-center gap-2 !rounded-xl">
+            <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+            <span className="font-display font-bold text-lg">{avgRating}</span>
+          </GlassCard>
+        )}
+      </motion.div>
+
+      {reviews.length > 0 ? (
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="grid gap-4 sm:grid-cols-2"
+        >
+          {reviews.map((review, index) => (
+            <motion.div key={index} variants={staggerItem}>
+              <GlassCard hover className="p-5 sm:p-6 h-full relative overflow-hidden">
+                <Quote className="absolute top-4 right-4 h-8 w-8 text-emerald/15" />
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald/30 to-emerald/10 font-semibold text-emerald border border-emerald/20">
+                    {(review.userId?.name || "A").charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">
+                      {review.userId?.name || "Anonymous"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(review.createdAt).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-0.5 mb-3">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={cn(
+                        "w-4 h-4",
+                        i < review.rating
+                          ? "fill-amber-400 text-amber-400"
+                          : "text-white/15",
+                      )}
+                    />
+                  ))}
+                </div>
+                {review.comment && (
+                  <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+                    "{review.comment}"
+                  </p>
+                )}
+              </GlassCard>
+            </motion.div>
+          ))}
+        </motion.div>
+      ) : (
+        <GlassCard className="p-12 text-center">
+          <Quote className="mx-auto h-10 w-10 text-emerald/30 mb-4" />
+          <p className="text-muted-foreground">
+            No reviews yet. Be the first to review!
+          </p>
+        </GlassCard>
+      )}
+    </div>
+  );
+}
 
 export default GroundDetails;

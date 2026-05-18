@@ -1,15 +1,29 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar, Clock, Users, MapPin, DollarSign, Star } from "lucide-react";
+import { GlassCard } from "@/components/ui/glass-card";
+import {
+  Calendar,
+  Clock,
+  Users,
+  MapPin,
+  DollarSign,
+  Star,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  Loader2,
+  IndianRupee,
+} from "lucide-react";
 import { format } from "date-fns";
-import { groundsApi, bookingsApi } from "@/lib/api";
+import { bookingsApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import PaymentModal from "@/components/PaymentModal";
-import { isMongoObjectId } from "@/lib/utils";
+import { cn, isMongoObjectId } from "@/lib/utils";
 import { API_BASE_URL } from "@/lib/config";
 
 interface Ground {
@@ -51,14 +65,48 @@ const ALL_24H_SLOTS = Array.from({ length: 24 }, (_, i) => {
   return { slot: `${start}-${end}`, label };
 });
 
-const NewBookingModal: React.FC<NewBookingModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  ground, 
-  onBookingCreated 
+const STEPS = [
+  { id: 1, label: "Date", icon: Calendar },
+  { id: 2, label: "Time", icon: Clock },
+  { id: 3, label: "Details", icon: Users },
+  { id: 4, label: "Review", icon: Star },
+] as const;
+
+const ease = [0.22, 1, 0.36, 1] as const;
+
+const stepVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? 40 : -40,
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+    transition: { duration: 0.35, ease },
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? -40 : 40,
+    opacity: 0,
+    transition: { duration: 0.25, ease },
+  }),
+};
+
+const inputClassName =
+  "h-12 border-white/[0.08] bg-white/[0.03] backdrop-blur-md text-foreground";
+
+const selectClassName =
+  "w-full h-12 px-4 rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md text-foreground text-sm focus:border-emerald/50 focus:outline-none focus:ring-2 focus:ring-emerald/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer";
+
+const NewBookingModal: React.FC<NewBookingModalProps> = ({
+  isOpen,
+  onClose,
+  ground,
+  onBookingCreated,
 }) => {
   const { user } = useAuth();
-  
+
+  const [currentStep, setCurrentStep] = useState(1);
+  const [direction, setDirection] = useState(0);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
@@ -75,7 +123,6 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
   const isPaymentModalOpenRef = useRef(isPaymentModalOpen);
   isPaymentModalOpenRef.current = isPaymentModalOpen;
 
-  // Generate next 7 days for quick date selection
   const getQuickDates = () => {
     const dates = [];
     for (let i = 0; i < 7; i++) {
@@ -87,14 +134,14 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
   };
 
   const isSameDay = (date1: Date, date2: Date) => {
-    return date1.getDate() === date2.getDate() &&
-           date1.getMonth() === date2.getMonth() &&
-           date1.getFullYear() === date2.getFullYear();
+    return (
+      date1.getDate() === date2.getDate() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getFullYear() === date2.getFullYear()
+    );
   };
 
-  const isToday = (date: Date) => {
-    return isSameDay(date, new Date());
-  };
+  const isToday = (date: Date) => isSameDay(date, new Date());
 
   const isTomorrow = (date: Date) => {
     const tomorrow = new Date();
@@ -106,6 +153,49 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
     if (isToday(date)) return "Today";
     if (isTomorrow(date)) return "Tomorrow";
     return format(date, "EEE");
+  };
+
+  const isStepComplete = (step: number) => {
+    switch (step) {
+      case 1:
+        return !!selectedDate;
+      case 2:
+        return !!selectedStartSlotObj && !!selectedEndTime;
+      case 3:
+        return !!playerCount && !!contactName && !!contactPhone;
+      case 4:
+        return (
+          !!selectedDate &&
+          !!selectedStartSlotObj &&
+          !!selectedEndTime &&
+          !!playerCount &&
+          !!contactName &&
+          !!contactPhone
+        );
+      default:
+        return false;
+    }
+  };
+
+  const canProceed = isStepComplete(currentStep);
+
+  const goToStep = (step: number) => {
+    setDirection(step > currentStep ? 1 : -1);
+    setCurrentStep(step);
+  };
+
+  const handleNext = () => {
+    if (currentStep < 4 && canProceed) {
+      setDirection(1);
+      setCurrentStep((s) => s + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setDirection(-1);
+      setCurrentStep((s) => s - 1);
+    }
   };
 
   useEffect(() => {
@@ -122,12 +212,8 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
     }
   }, [ground, selectedDate]);
 
-
-
-  // Refresh availability when modal opens
   useEffect(() => {
     if (isOpen && user) {
-      // Small delay to ensure the modal is fully opened
       const timer = setTimeout(() => {
         fetchAvailability();
       }, 100);
@@ -139,30 +225,28 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
     if (!isOpen) {
       setIsPaymentModalOpen(false);
       setCreatedBooking(null);
+      setCurrentStep(1);
+      setDirection(0);
     }
   }, [isOpen]);
-
-
-
-
 
   const fetchAvailability = async () => {
     if (!ground || !selectedDate) return;
     setIsLoadingSlots(true);
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      
-      // Use the new bookings endpoint that excludes temporary holds
+
       const response = await bookingsApi.getGroundAvailability(ground._id, dateStr);
       let bookedSlots: string[] = [];
-      
+
       if (response && (response as any).success && (response as any).availability) {
         bookedSlots = (response as any).availability.bookedSlots || [];
       }
-      
+
       const now = new Date();
-      const isSelectedToday = format(selectedDate, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
-      
+      const isSelectedToday =
+        format(selectedDate, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
+
       setAvailableSlots(
         ALL_24H_SLOTS.map((slot) => {
           const slotHour = parseInt(slot.slot.split(":")[0], 10);
@@ -172,47 +256,44 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
             ...slot,
             isAvailable: !isPast && !isBooked,
           };
-        })
+        }),
       );
     } catch (e) {
       console.warn("Failed to fetch availability, showing all slots as available:", e);
       setAvailableSlots(
-        ALL_24H_SLOTS.map((slot) => ({ ...slot, isAvailable: true }))
+        ALL_24H_SLOTS.map((slot) => ({ ...slot, isAvailable: true })),
       );
     } finally {
       setIsLoadingSlots(false);
     }
   };
 
-  // Helper to get available end times for a given start slot object
   const getAvailableEndTimes = (startSlotObj: TimeSlot | null) => {
     if (!startSlotObj) return [];
-    const startIdx = availableSlots.findIndex(s => s.slot === startSlotObj.slot);
+    const startIdx = availableSlots.findIndex((s) => s.slot === startSlotObj.slot);
     if (startIdx === -1) return [];
     const maxDuration = 6;
     const endTimes: { value: string; label: string; duration: number }[] = [];
-    
-    // Get all booked time ranges for overlap checking
+
     const bookedRanges = availableSlots
-      .filter(slot => !slot.isAvailable)
-      .map(slot => {
-        const [start, end] = slot.slot.split('-');
+      .filter((slot) => !slot.isAvailable)
+      .map((slot) => {
+        const [start, end] = slot.slot.split("-");
         return {
           start: new Date(`2000-01-01 ${start}`),
-          end: new Date(`2000-01-01 ${end}`)
+          end: new Date(`2000-01-01 ${end}`),
         };
       });
-    
-    const startTimeDate = new Date(`2000-01-01 ${startSlotObj.slot.split('-')[0]}`);
-    
+
+    const startTimeDate = new Date(`2000-01-01 ${startSlotObj.slot.split("-")[0]}`);
+
     for (let dur = 1; dur <= maxDuration; dur++) {
       const endIdx = startIdx + dur;
       if (endIdx > availableSlots.length) break;
-      
+
       const endSlot = availableSlots[endIdx - 1];
-      const endTimeDate = new Date(`2000-01-01 ${endSlot.slot.split('-')[1]}`);
-      
-      // Check if this time range overlaps with any booked range
+      const endTimeDate = new Date(`2000-01-01 ${endSlot.slot.split("-")[1]}`);
+
       let hasOverlap = false;
       for (const bookedRange of bookedRanges) {
         if (startTimeDate < bookedRange.end && endTimeDate > bookedRange.start) {
@@ -220,10 +301,9 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
           break;
         }
       }
-      
+
       if (hasOverlap) break;
-      
-      // Also check if all intermediate slots are available
+
       let allAvailable = true;
       for (let i = startIdx; i < endIdx; i++) {
         if (!availableSlots[i] || !availableSlots[i].isAvailable) {
@@ -231,11 +311,11 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
           break;
         }
       }
-      
+
       if (allAvailable) {
         endTimes.push({
-          value: endSlot.slot.split('-')[1],
-          label: endSlot.label.split(' - ')[1],
+          value: endSlot.slot.split("-")[1],
+          label: endSlot.label.split(" - ")[1],
           duration: dur,
         });
       } else {
@@ -245,40 +325,40 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
     return endTimes;
   };
 
-  // Helper to find the price range for a given hour
-  const findRangeForHour = (hour: number, ranges: { start: string; end: string; perHour: number }[]) => {
+  const findRangeForHour = (
+    hour: number,
+    ranges: { start: string; end: string; perHour: number }[],
+  ) => {
     for (const range of ranges) {
-      const start = parseInt(range.start.split(':')[0], 10);
-      const end = parseInt(range.end.split(':')[0], 10);
+      const start = parseInt(range.start.split(":")[0], 10);
+      const end = parseInt(range.end.split(":")[0], 10);
       if (start < end) {
-        // e.g., 06:00-18:00
         if (hour >= start && hour < end) return range;
       } else {
-        // e.g., 18:00-06:00 (overnight)
         if (hour >= start || hour < end) return range;
       }
     }
     return null;
   };
 
-  // Helper to calculate total price and breakdown for the selected range
   const calculateTotalPriceAndBreakdown = () => {
-    if (!selectedStartSlotObj || !selectedEndTime || !ground) return { total: 0, breakdown: [] };
-    const startHour = parseInt(selectedStartSlotObj.slot.split(':')[0], 10);
-    const endHour = parseInt(selectedEndTime.split(':')[0], 10);
+    if (!selectedStartSlotObj || !selectedEndTime || !ground)
+      return { total: 0, breakdown: [] };
+    const startHour = parseInt(selectedStartSlotObj.slot.split(":")[0], 10);
+    const endHour = parseInt(selectedEndTime.split(":")[0], 10);
     let total = 0;
     let hour = startHour;
     const breakdown: { hour: string; rate: number | string; type: string }[] = [];
     while (hour !== endHour) {
       const range = findRangeForHour(hour, ground.price.ranges);
-      let rate = range ? range.perHour : 'Not set';
-      let type = range ? `${range.start} - ${range.end}` : 'No Range';
+      const rate = range ? range.perHour : "Not set";
+      const type = range ? `${range.start} - ${range.end}` : "No Range";
       breakdown.push({
-        hour: `${hour.toString().padStart(2, '0')}:00 - ${(hour + 1) % 24 === 0 ? '00' : (hour + 1).toString().padStart(2, '0')}:00`,
+        hour: `${hour.toString().padStart(2, "0")}:00 - ${(hour + 1) % 24 === 0 ? "00" : (hour + 1).toString().padStart(2, "0")}:00`,
         rate,
-        type
+        type,
       });
-      if (typeof rate === 'number') total += rate;
+      if (typeof rate === "number") total += rate;
       hour = (hour + 1) % 24;
       if (hour === startHour) break;
     }
@@ -286,34 +366,41 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
   };
 
   const handleBook = async () => {
-    if (!ground || !selectedDate || !selectedStartSlotObj || !selectedEndTime || !playerCount || !contactName || !contactPhone) return;
+    if (
+      !ground ||
+      !selectedDate ||
+      !selectedStartSlotObj ||
+      !selectedEndTime ||
+      !playerCount ||
+      !contactName ||
+      !contactPhone
+    )
+      return;
     if (!user) {
       toast.error("Please login to create a booking");
       return;
     }
-    
-    // Prevent multiple rapid clicks
+
     if (isCreatingBooking) {
       console.log("Already creating booking, ignoring duplicate click");
       return;
     }
-    
+
     try {
       const API = API_BASE_URL;
       const healthResponse = await fetch(`${API}/health`);
-      if (!healthResponse.ok) throw new Error('Server not responding');
+      if (!healthResponse.ok) throw new Error("Server not responding");
     } catch {
       toast.error("Server is not running. Please start the server first.");
       return;
     }
 
     setIsCreatingBooking(true);
-    
+
     try {
       const formattedDate = format(selectedDate, "yyyy-MM-dd");
-      const timeSlot = `${selectedStartSlotObj.slot.split('-')[0]}-${selectedEndTime}`;
-      
-      // Create the booking (no temporary hold yet)
+      const timeSlot = `${selectedStartSlotObj.slot.split("-")[0]}-${selectedEndTime}`;
+
       const bookingData = {
         groundId: ground._id,
         bookingDate: formattedDate,
@@ -329,20 +416,19 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
         },
         requirements: undefined,
       };
-      
+
       console.log("Creating booking:", bookingData);
       const bookingResponse = await bookingsApi.createBooking(bookingData);
-      
+
       if (bookingResponse && (bookingResponse as any).success) {
         toast.success("Booking created! Please complete payment to confirm.");
-        
-        // Manually attach the ground object to the booking for PaymentModal
+
         const bookingWithGroundData = {
           ...(bookingResponse as any).booking,
           groundId: ground,
-          ground: ground
+          ground: ground,
         };
-        
+
         console.log("Booking created successfully:", bookingWithGroundData);
         setCreatedBooking(bookingWithGroundData);
         setIsPaymentModalOpen(true);
@@ -352,19 +438,18 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
     } catch (error: any) {
       console.error("Booking error:", error);
       let errorMessage = "Failed to create booking. Please try again.";
-      
+
       if (error.response?.status === 409) {
-        // Conflict error - slot is taken
-        errorMessage = error.response?.data?.message || "This slot is no longer available. Please select a different time.";
+        errorMessage =
+          error.response?.data?.message ||
+          "This slot is no longer available. Please select a different time.";
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       toast.error(errorMessage);
-      
-      // Refresh availability to show updated slots
       await fetchAvailability();
     } finally {
       setIsCreatingBooking(false);
@@ -382,16 +467,339 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
   const handlePaymentModalClose = async () => {
     setIsPaymentModalOpen(false);
     setCreatedBooking(null);
-    
-    // Refresh availability to show updated slots
     await fetchAvailability();
   };
 
   if (!ground) return null;
 
   if (!isMongoObjectId(ground._id)) {
-    return <div className="p-6 text-center text-red-600">This ground cannot be booked online.</div>;
+    return (
+      <div className="p-6 text-center text-destructive">
+        This ground cannot be booked online.
+      </div>
+    );
   }
+
+  const { total, breakdown } = calculateTotalPriceAndBreakdown();
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-display text-lg font-semibold text-foreground">
+                Select Date
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Choose from the next 7 days
+              </p>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3">
+              {getQuickDates().map((date, index) => {
+                const isSelected = selectedDate && isSameDay(date, selectedDate);
+                return (
+                  <motion.button
+                    key={index}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => {
+                      setSelectedDate(date);
+                      setSelectedStartSlotObj(null);
+                      setSelectedEndTime("");
+                    }}
+                    className={cn(
+                      "relative p-3 sm:p-4 rounded-xl text-center transition-all duration-200 min-h-[76px] sm:min-h-[84px] border",
+                      isSelected
+                        ? "border-emerald/50 bg-emerald/10 shadow-glow-sm text-emerald"
+                        : "border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/[0.15] text-foreground",
+                    )}
+                  >
+                    {isSelected && (
+                      <motion.div
+                        layoutId="date-selected"
+                        className="absolute inset-0 rounded-xl border border-emerald/30 bg-emerald/5"
+                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      />
+                    )}
+                    <div className="relative z-10">
+                      <div className="text-xs font-medium text-muted-foreground">
+                        {getDateLabel(date)}
+                      </div>
+                      <div className="text-xl sm:text-2xl font-bold font-display">
+                        {format(date, "d")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{format(date, "MMM")}</div>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      case 2:
+        return (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-display text-lg font-semibold text-foreground">
+                Select Time Range
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Pick your start and end time
+              </p>
+            </div>
+
+            {isLoadingSlots ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald" />
+                <span className="text-sm text-muted-foreground">Loading available slots...</span>
+              </div>
+            ) : availableSlots.filter((s) => s.isAvailable).length === 0 ? (
+              <GlassCard className="p-8 text-center">
+                <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                <p className="text-muted-foreground">No available slots for this day</p>
+              </GlassCard>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Start Time
+                    </Label>
+                    <select
+                      className={selectClassName}
+                      value={selectedStartSlotObj ? selectedStartSlotObj.slot : ""}
+                      onChange={(e) => {
+                        const slotObj = availableSlots.find((s) => s.slot === e.target.value);
+                        setSelectedStartSlotObj(slotObj || null);
+                        setSelectedEndTime("");
+                      }}
+                    >
+                      <option value="" className="bg-[#0a0a0a]">
+                        Select Start Time
+                      </option>
+                      {availableSlots
+                        .filter((s) => s.isAvailable)
+                        .map((slot) => (
+                          <option key={slot.slot} value={slot.slot} className="bg-[#0a0a0a]">
+                            {slot.label.split(" - ")[0]}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      End Time
+                    </Label>
+                    <select
+                      className={selectClassName}
+                      value={selectedEndTime}
+                      onChange={(e) => setSelectedEndTime(e.target.value)}
+                      disabled={!selectedStartSlotObj}
+                    >
+                      <option value="" className="bg-[#0a0a0a]">
+                        Select End Time
+                      </option>
+                      {getAvailableEndTimes(selectedStartSlotObj).map((end) => (
+                        <option key={end.value} value={end.value} className="bg-[#0a0a0a]">
+                          {end.label} ({end.duration} hr{end.duration > 1 ? "s" : ""})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {selectedStartSlotObj && selectedEndTime && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-xl border border-emerald/20 bg-emerald/5 px-4 py-3"
+                  >
+                    <p className="text-sm text-emerald font-medium">
+                      Duration:{" "}
+                      {(parseInt(selectedEndTime.split(":")[0], 10) -
+                        parseInt(selectedStartSlotObj.slot.split(":")[0], 10) +
+                        24) %
+                        24}{" "}
+                      hour(s)
+                    </p>
+                  </motion.div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="font-display text-lg font-semibold text-foreground">
+                Team & Contact Details
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Tell us about your booking
+              </p>
+            </div>
+
+            <GlassCard className="p-4 sm:p-5 space-y-4">
+              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Users className="w-4 h-4 text-emerald" />
+                Team Details
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Team Name (Optional)
+                  </Label>
+                  <Input
+                    placeholder="Enter your team name"
+                    value={teamName}
+                    onChange={(e) => setTeamName(e.target.value)}
+                    className={inputClassName}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Number of Players *
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={ground.features.capacity}
+                    placeholder="Enter number of players"
+                    value={playerCount}
+                    onChange={(e) => setPlayerCount(e.target.value)}
+                    className={inputClassName}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum {ground.features.capacity} players allowed
+                  </p>
+                </div>
+              </div>
+            </GlassCard>
+
+            <GlassCard className="p-4 sm:p-5 space-y-4">
+              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Users className="w-4 h-4 text-emerald" />
+                Contact Person
+              </h4>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Full Name *
+                    </Label>
+                    <Input
+                      placeholder="Contact person name"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      className={inputClassName}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Phone Number *
+                    </Label>
+                    <Input
+                      type="tel"
+                      placeholder="Contact phone number"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      className={inputClassName}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Email Address (Optional)
+                  </Label>
+                  <Input
+                    type="email"
+                    placeholder="Contact email address"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    className={inputClassName}
+                  />
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-display text-lg font-semibold text-foreground">
+                Booking Summary
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Review your booking before payment
+              </p>
+            </div>
+
+            <GlassCard className="p-4 sm:p-5 space-y-4">
+              <div className="space-y-3">
+                {[
+                  {
+                    label: "Date",
+                    value: selectedDate
+                      ? format(selectedDate, "EEEE, MMMM d, yyyy")
+                      : "—",
+                  },
+                  {
+                    label: "Time",
+                    value: selectedStartSlotObj
+                      ? `${selectedStartSlotObj.slot.split("-")[0]} - ${selectedEndTime}`
+                      : "—",
+                  },
+                  { label: "Players", value: `${playerCount} players` },
+                  { label: "Team", value: teamName || "—" },
+                  { label: "Contact", value: contactName },
+                  { label: "Phone", value: contactPhone },
+                ].map((row) => (
+                  <div
+                    key={row.label}
+                    className="flex flex-col sm:flex-row sm:justify-between gap-0.5 py-2 border-b border-white/[0.06] last:border-0"
+                  >
+                    <span className="text-sm text-muted-foreground">{row.label}</span>
+                    <span className="text-sm font-medium text-foreground">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </GlassCard>
+
+            <GlassCard className="p-4 sm:p-5 space-y-3">
+              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <IndianRupee className="w-4 h-4 text-emerald" />
+                Price Breakdown
+              </h4>
+              <div className="space-y-2">
+                {breakdown.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hours selected.</p>
+                ) : (
+                  breakdown.map((b, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{b.hour}</span>
+                      <span className="font-medium">
+                        {typeof b.rate === "number" ? `₹${b.rate}` : b.rate}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="border-t border-white/[0.08] pt-3 flex justify-between items-center">
+                <span className="font-semibold text-foreground">Total</span>
+                <span className="text-xl font-bold font-display text-emerald">₹{total}</span>
+              </div>
+            </GlassCard>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <>
@@ -403,311 +811,192 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
           }
         }}
       >
-      <DialogContent 
-        className="max-w-4xl w-[95vw] sm:w-full rounded-2xl sm:rounded-2xl p-0 overflow-hidden shadow-2xl border-0 bg-white max-h-[95vh] sm:max-h-[90vh]"
-      >
-        <DialogDescription className="sr-only">
-          Book a cricket ground slot by selecting date, time, and providing contact details.
-        </DialogDescription>
-        <div className="relative bg-gradient-to-r from-green-600 via-green-500 to-emerald-500 px-6 sm:px-8 py-4 sm:py-6 text-white">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <DialogHeader className="relative z-10">
-            <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center">
-                <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
-              </div>
-              <span className="line-clamp-1">Book {ground.name}</span>
-            </DialogTitle>
-            <div className="text-green-100 mt-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <span className="flex items-center gap-1 text-sm">
-                <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="line-clamp-1">{ground.location.address}</span>
-              </span>
-              <span className="flex items-center gap-1 text-sm flex-wrap">
-                <DollarSign className="w-3 h-3 sm:w-4 sm:h-4" />
-                {Array.isArray(ground?.price?.ranges) && ground.price.ranges.length > 0
-                  ? ground.price.ranges.map((r, i) => (
-                      <span key={i} className="text-xs sm:text-sm whitespace-nowrap">{r.start}-{r.end}: ₹{r.perHour}/hr</span>
-                    ))
-                  : <span className="text-xs sm:text-sm">No price ranges set</span>}
-              </span>
-              <span className="flex items-center gap-1 text-sm">
-                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="whitespace-nowrap">Max {ground.features.capacity}</span>
-              </span>
-            </div>
-          </DialogHeader>
-          <div className="absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 bg-white/10 rounded-full -translate-y-8 translate-x-8"></div>
-          <div className="absolute bottom-0 left-0 w-20 h-20 sm:w-24 sm:h-24 bg-white/10 rounded-full translate-y-4 -translate-x-4"></div>
-        </div>
-
-        <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-h-[75vh] overflow-y-auto">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-5 h-5 text-green-600" />
-              <h3 className="text-lg sm:text-xl font-semibold text-gray-800">Select Date</h3>
-            </div>
-            
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3">
-              {getQuickDates().map((date, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    setSelectedDate(date);
-                    setSelectedStartSlotObj(null);
-                    setSelectedEndTime("");
-                  }}
-                  className={`p-3 sm:p-4 rounded-xl text-center transition-all duration-200 min-h-[70px] sm:min-h-[80px] touch-target border-2 ${
-                    selectedDate && isSameDay(date, selectedDate)
-                      ? "bg-green-600 text-white shadow-lg scale-105 border-green-600"
-                      : "bg-white hover:bg-green-50 border-gray-200 hover:border-green-300 text-gray-700 hover:shadow-md"
-                  }`}
-                >
-                  <div className="text-xs font-medium">{getDateLabel(date)}</div>
-                  <div className="text-xl sm:text-2xl font-bold">{format(date, "d")}</div>
-                  <div className="text-xs opacity-75">{format(date, "MMM")}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Clock className="w-5 h-5 text-green-600" />
-              <h3 className="text-lg sm:text-xl font-semibold text-gray-800">Select Time Range</h3>
-            </div>
-            
-            {isLoadingSlots ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-                <span className="ml-3 text-gray-600">Loading available slots...</span>
-              </div>
-            ) : availableSlots.filter((s) => s.isAvailable).length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-xl">
-                <Clock className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600">No available slots for this day</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">Start Time</Label>
-                    <select
-                      className="w-full p-3 sm:p-4 rounded-xl border-2 border-gray-200 focus:border-green-500 focus:outline-none text-gray-700 text-base bg-white min-h-[50px] transition-colors"
-                      value={selectedStartSlotObj ? selectedStartSlotObj.slot : ""}
-                      onChange={e => {
-                        const slotObj = availableSlots.find(s => s.slot === e.target.value);
-                        setSelectedStartSlotObj(slotObj || null);
-                        setSelectedEndTime("");
-                      }}
-                    >
-                      <option value="">Select Start Time</option>
-                      {availableSlots.filter(s => s.isAvailable).map(slot => (
-                        <option key={slot.slot} value={slot.slot}>
-                          {slot.label.split(' - ')[0]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">End Time</Label>
-                    <select
-                      className="w-full p-3 sm:p-4 rounded-xl border-2 border-gray-200 focus:border-green-500 focus:outline-none text-gray-700 text-base bg-white min-h-[50px] transition-colors disabled:bg-gray-100 disabled:text-gray-400"
-                      value={selectedEndTime}
-                      onChange={e => setSelectedEndTime(e.target.value)}
-                      disabled={!selectedStartSlotObj}
-                    >
-                      <option value="">Select End Time</option>
-                      {getAvailableEndTimes(selectedStartSlotObj).map(end => (
-                        <option key={end.value} value={end.value}>
-                          {end.label} ({end.duration} hr{end.duration > 1 ? 's' : ''})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                {selectedStartSlotObj && selectedEndTime && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="text-sm text-green-700 font-medium">
-                      Duration: {((parseInt(selectedEndTime.split(':')[0], 10) - parseInt(selectedStartSlotObj.slot.split(':')[0], 10) + 24) % 24)} hour(s)
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="bg-gray-50 rounded-xl p-4 sm:p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <Users className="w-5 h-5 text-green-600" />
-              Team Details
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">
-                  Team Name (Optional)
-                </Label>
-                <Input
-                  placeholder="Enter your team name"
-                  value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
-                  className="border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl h-12 sm:h-14 text-base bg-white"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">
-                  Number of Players *
-                </Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={ground.features.capacity}
-                  placeholder="Enter number of players"
-                  value={playerCount}
-                  onChange={(e) => setPlayerCount(e.target.value)}
-                  className="border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl h-12 sm:h-14 text-base bg-white"
-                />
-                <p className="text-xs text-gray-500">Maximum {ground.features.capacity} players allowed</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 sm:p-6 border border-green-200">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5 text-green-600" />
-              Contact Person Details
-            </h3>
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">
-                    Full Name *
-                  </Label>
-                  <Input
-                    placeholder="Contact person name"
-                    value={contactName}
-                    onChange={e => setContactName(e.target.value)}
-                    className="border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl h-12 sm:h-14 text-base bg-white"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">
-                    Phone Number *
-                  </Label>
-                  <Input
-                    type="tel"
-                    placeholder="Contact phone number"
-                    value={contactPhone}
-                    onChange={e => setContactPhone(e.target.value)}
-                    className="border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl h-12 sm:h-14 text-base bg-white"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">
-                  Email Address (Optional)
-                </Label>
-                <Input
-                  type="email"
-                  placeholder="Contact email address"
-                  value={contactEmail}
-                  onChange={e => setContactEmail(e.target.value)}
-                  className="border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl h-12 sm:h-14 text-base bg-white"
-                />
-              </div>
-            </div>
-          </div>
-
-          {selectedDate && selectedStartSlotObj && selectedEndTime && playerCount && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 rounded-xl p-4 sm:p-6 border">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <Star className="w-5 h-5 text-blue-600" />
-                Booking Summary
-              </h3>
-              <div className="space-y-4">
-                <div className="bg-white rounded-lg p-4 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                    <span className="text-gray-600 text-sm font-medium">Date:</span>
-                    <span className="font-semibold text-sm">{format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                    <span className="text-gray-600 text-sm font-medium">Time:</span>
-                    <span className="font-semibold text-sm">{selectedStartSlotObj.slot.split('-')[0]} - {selectedEndTime}</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                    <span className="text-gray-600 text-sm font-medium">Players:</span>
-                    <span className="font-semibold text-sm">{playerCount} players</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                    <span className="text-gray-600 text-sm font-medium">Rate:</span>
-                    <div className="font-semibold text-sm text-right">
-                      {Array.isArray(ground?.price?.ranges) && ground.price.ranges.length > 0
-                        ? ground.price.ranges.map((r, i) => (
-                            <div key={i} className="">{r.start}-{r.end}: ₹{r.perHour}/hr</div>
-                          ))
-                        : 'No price ranges set'}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Price breakdown */}
-                <div className="space-y-2">
-                  <div className="font-semibold text-sm">Price Breakdown:</div>
-                  <div className="bg-white rounded-lg p-3 border border-blue-100 space-y-2">
-                    {calculateTotalPriceAndBreakdown().breakdown.length === 0 ? (
-                      <div className="text-sm text-gray-500">No hours selected.</div>
-                    ) : (
-                      calculateTotalPriceAndBreakdown().breakdown.map((b, i) => (
-                        <div key={i} className="flex justify-between text-sm">
-                          <span className="flex-1">{b.hour}</span>
-                          <span className="font-medium ml-2">{typeof b.rate === 'number' ? `₹${b.rate}` : b.rate}</span>
-                        </div>
-                      ))
-                    )}
-                    <div className="border-t border-gray-200 pt-2 flex justify-between text-lg font-bold">
-                      <span>Total:</span>
-                      <span className="text-green-600">₹{calculateTotalPriceAndBreakdown().total}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <DialogContent
+          className={cn(
+            "max-w-4xl w-[95vw] sm:w-full rounded-2xl p-0 overflow-hidden border-white/[0.08] bg-[#0a0a0a]/95 shadow-glass-lg backdrop-blur-2xl max-h-[95vh] sm:max-h-[90vh]",
+            "before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-gradient-to-br before:from-emerald/10 before:via-transparent before:to-emerald/5",
           )}
+        >
+          <DialogDescription className="sr-only">
+            Book a cricket ground slot by selecting date, time, and providing contact details.
+          </DialogDescription>
 
-          <div className="sticky bottom-0 bg-white pt-4 pb-2 border-t border-gray-100">
-            <div className="flex gap-3 sm:gap-4">
-              <Button 
-                variant="outline" 
-                onClick={onClose} 
-                className="flex-1 h-12 sm:h-14 rounded-xl border-gray-300 hover:bg-gray-50 text-gray-700 font-medium"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleBook}
-                disabled={!selectedDate || !selectedStartSlotObj || !selectedEndTime || !playerCount || !contactName || !contactPhone || isCreatingBooking}
-                className="flex-1 h-12 sm:h-14 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                {isCreatingBooking ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Creating Booking...
-                  </div>
-                ) : !selectedDate || !selectedStartSlotObj || !selectedEndTime || !playerCount || !contactName || !contactPhone ? (
-                  "Complete Details"
-                ) : (
-                  "Proceed to Payment"
-                )}
-              </Button>
+          <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-emerald/15 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-emerald/8 blur-3xl" />
+          <div className="noise-overlay pointer-events-none absolute inset-0 opacity-30" />
+
+          {/* Header */}
+          <div className="relative z-10 border-b border-white/[0.06] px-6 sm:px-8 py-5 sm:py-6">
+            <DialogHeader>
+              <DialogTitle className="font-display text-xl sm:text-2xl font-bold flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald/15 border border-emerald/25">
+                  <MapPin className="w-5 h-5 text-emerald" />
+                </div>
+                <span className="line-clamp-1">
+                  Book <span className="gradient-text">{ground.name}</span>
+                </span>
+              </DialogTitle>
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-5 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-emerald shrink-0" />
+                  <span className="line-clamp-1">{ground.location.address}</span>
+                </span>
+                <span className="flex items-center gap-1.5 flex-wrap">
+                  <DollarSign className="w-3.5 h-3.5 text-emerald shrink-0" />
+                  {Array.isArray(ground?.price?.ranges) && ground.price.ranges.length > 0
+                    ? ground.price.ranges.map((r, i) => (
+                        <span key={i} className="text-xs whitespace-nowrap">
+                          {r.start}-{r.end}: ₹{r.perHour}/hr
+                        </span>
+                      ))
+                    : "No price ranges set"}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-emerald shrink-0" />
+                  <span className="whitespace-nowrap">Max {ground.features.capacity}</span>
+                </span>
+              </div>
+            </DialogHeader>
+
+            {/* Stepper */}
+            <div className="mt-6 flex items-center justify-between">
+              {STEPS.map((step, index) => {
+                const StepIcon = step.icon;
+                const isActive = currentStep === step.id;
+                const isComplete = isStepComplete(step.id) && currentStep > step.id;
+                const isClickable = step.id < currentStep || isStepComplete(step.id);
+
+                return (
+                  <React.Fragment key={step.id}>
+                    <button
+                      type="button"
+                      disabled={!isClickable && !isActive}
+                      onClick={() => isClickable && goToStep(step.id)}
+                      className={cn(
+                        "flex flex-col items-center gap-1.5 group transition-all",
+                        isClickable || isActive ? "cursor-pointer" : "cursor-default",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border transition-all duration-300",
+                          isActive
+                            ? "border-emerald/50 bg-emerald/15 shadow-glow-sm text-emerald"
+                            : isComplete
+                              ? "border-emerald/30 bg-emerald/10 text-emerald"
+                              : "border-white/[0.08] bg-white/[0.03] text-muted-foreground",
+                        )}
+                      >
+                        {isComplete && !isActive ? (
+                          <Check className="w-4 h-4" />
+                        ) : (
+                          <StepIcon className="w-4 h-4" />
+                        )}
+                        {isActive && (
+                          <motion.div
+                            layoutId="step-indicator"
+                            className="absolute inset-0 rounded-xl border border-emerald/40"
+                            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                          />
+                        )}
+                      </div>
+                      <span
+                        className={cn(
+                          "text-[10px] sm:text-xs font-medium hidden xs:block",
+                          isActive ? "text-emerald" : "text-muted-foreground",
+                        )}
+                      >
+                        {step.label}
+                      </span>
+                    </button>
+                    {index < STEPS.length - 1 && (
+                      <div className="flex-1 mx-1 sm:mx-2 h-px relative">
+                        <div className="absolute inset-0 bg-white/[0.08]" />
+                        <motion.div
+                          className="absolute inset-y-0 left-0 bg-emerald/50"
+                          initial={false}
+                          animate={{
+                            width: currentStep > step.id ? "100%" : "0%",
+                          }}
+                          transition={{ duration: 0.4, ease }}
+                        />
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+
+          {/* Step Content */}
+          <div className="relative z-10 px-6 sm:px-8 py-5 sm:py-6 max-h-[50vh] sm:max-h-[55vh] overflow-y-auto scrollbar-hide">
+            <AnimatePresence mode="wait" custom={direction}>
+              <motion.div
+                key={currentStep}
+                custom={direction}
+                variants={stepVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
+                {renderStepContent()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Footer Navigation */}
+          <div className="relative z-10 border-t border-white/[0.06] px-6 sm:px-8 py-4 sm:py-5 bg-white/[0.02] backdrop-blur-md">
+            <div className="flex gap-3 sm:gap-4">
+              {currentStep > 1 ? (
+                <Button
+                  variant="outline"
+                  onClick={handleBack}
+                  className="h-12 sm:h-13 rounded-xl"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Back
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={onClose}
+                  className="h-12 sm:h-13 rounded-xl"
+                >
+                  Cancel
+                </Button>
+              )}
+
+              {currentStep < 4 ? (
+                <Button
+                  variant="glow"
+                  onClick={handleNext}
+                  disabled={!canProceed}
+                  className="flex-1 h-12 sm:h-13 rounded-xl"
+                >
+                  Continue
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="glow"
+                  onClick={handleBook}
+                  disabled={!canProceed || isCreatingBooking}
+                  className="flex-1 h-12 sm:h-13 rounded-xl"
+                >
+                  {isCreatingBooking ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Creating Booking...
+                    </>
+                  ) : (
+                    <>Proceed to Payment</>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <PaymentModal
         isOpen={isPaymentModalOpen}
