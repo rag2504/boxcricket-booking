@@ -747,11 +747,11 @@ const BookingDetails = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
+      <div className="min-h-screen mesh-bg bg-background">
         <Navbar />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="flex items-center justify-center min-h-[400px]">
-            <div className="w-8 h-8 border-4 border-cricket-green border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-emerald border-t-transparent rounded-full animate-spin" />
           </div>
         </div>
       </div>
@@ -760,11 +760,11 @@ const BookingDetails = () => {
 
   if (!booking) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
+      <div className="min-h-screen mesh-bg bg-background">
         <Navbar />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            <h1 className="text-2xl font-bold text-foreground mb-4">
               Booking Not Found
             </h1>
             <Button onClick={() => navigate("/profile/bookings")}>
@@ -778,7 +778,7 @@ const BookingDetails = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-grass-light via-white to-sky-blue/10">
+    <div className="min-h-screen mesh-bg bg-background">
       <Navbar />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -807,7 +807,7 @@ const BookingDetails = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5 text-cricket-green" />
+                  <Shield className="w-5 h-5 text-emerald" />
                   <span>Booking Details</span>
                 </CardTitle>
               </CardHeader>
@@ -817,13 +817,13 @@ const BookingDetails = () => {
                     <h2 className="text-xl font-semibold">
                       {ground?.name || "Unknown Ground"}
                     </h2>
-                    <div className="flex items-center space-x-1 text-gray-600 mt-1">
+                    <div className="flex items-center space-x-1 text-muted-foreground mt-1">
                       <MapPin className="w-4 h-4" />
                       <span>{ground?.location?.address || ""}</span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-gray-600">Booking ID</div>
+                    <div className="text-sm text-muted-foreground">Booking ID</div>
                     <div className="font-mono font-semibold">
                       {booking.bookingId || booking._id}
                     </div>
@@ -834,9 +834,9 @@ const BookingDetails = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="flex items-center space-x-3">
-                    <Calendar className="w-5 h-5 text-cricket-green" />
+                    <Calendar className="w-5 h-5 text-emerald" />
                     <div>
-                      <div className="text-sm text-gray-600">Date</div>
+                      <div className="text-sm text-muted-foreground">Date</div>
                       <div className="font-medium">
                         {formatDate(booking.bookingDate)}
                       </div>
@@ -844,9 +844,9 @@ const BookingDetails = () => {
                   </div>
 
                   <div className="flex items-center space-x-3">
-                    <Clock className="w-5 h-5 text-cricket-green" />
+                    <Clock className="w-5 h-5 text-emerald" />
                     <div>
-                      <div className="text-sm text-gray-600">Time</div>
+                      <div className="text-sm text-muted-foreground">Time</div>
                       <div className="font-medium">
                         {booking.timeSlot?.startTime
                           ? booking.timeSlot.startTime +
@@ -858,9 +858,9 @@ const BookingDetails = () => {
                   </div>
 
                   <div className="flex items-center space-x-3">
-                    <Users className="w-5 h-5 text-cricket-green" />
+                    <Users className="w-5 h-5 text-emerald" />
                     <div>
-                      <div className="text-sm text-gray-600">Players</div>
+                      <div className="text-sm text-muted-foreground">Players</div>
                       <div className="font-medium">
                         {playerDetails?.playerCount || ""}
                       </div>
@@ -870,7 +870,7 @@ const BookingDetails = () => {
 
                 {playerDetails?.teamName && (
                   <div>
-                    <div className="text-sm text-gray-600">Team Name</div>
+                    <div className="text-sm text-muted-foreground">Team Name</div>
                     <div className="font-medium">
                       {playerDetails.teamName}
                     </div>
@@ -887,18 +887,18 @@ const BookingDetails = () => {
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center space-x-3">
-                    <User className="w-5 h-5 text-gray-500" />
+                    <User className="w-5 h-5 text-muted-foreground" />
                     <span className="font-medium">
                       {contactPerson?.name || ""}
                     </span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <Phone className="w-5 h-5 text-gray-500" />
+                    <Phone className="w-5 h-5 text-muted-foreground" />
                     <span>{contactPerson?.phone || ""}</span>
                   </div>
                   {contactPerson?.email && (
                     <div className="flex items-center space-x-3">
-                      <Mail className="w-5 h-5 text-gray-500" />
+                      <Mail className="w-5 h-5 text-muted-foreground" />
                       <span>{contactPerson.email}</span>
                     </div>
                   )}
@@ -928,11 +928,11 @@ const BookingDetails = () => {
                       <span className="font-medium">
                         {ground?.rating?.average || "N/A"}
                       </span>
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-muted-foreground">
                         ({ground?.rating?.count || 0} reviews)
                       </span>
                     </div>
-                    <div className="space-y-1 text-sm text-gray-600">
+                    <div className="space-y-1 text-sm text-muted-foreground">
                       <div>
                         Pitch: {ground?.features?.pitchType || "N/A"}
                       </div>
@@ -958,7 +958,7 @@ const BookingDetails = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <CreditCard className="w-5 h-5 text-cricket-green" />
+                  <CreditCard className="w-5 h-5 text-emerald" />
                   <span>Payment Summary</span>
                 </CardTitle>
               </CardHeader>
@@ -980,13 +980,13 @@ const BookingDetails = () => {
                 <Separator />
                 <div className="flex justify-between font-semibold">
                   <span>Total Amount</span>
-                  <span className="text-cricket-green">
+                  <span className="text-emerald">
                     ₹{pricing.totalAmount || booking.amount || ""}
                   </span>
                 </div>
 
                 <div className="mt-4">
-                  <div className="text-sm text-gray-600 mb-2">
+                  <div className="text-sm text-muted-foreground mb-2">
                     Payment Status
                   </div>
                   <Badge
@@ -1011,14 +1011,14 @@ const BookingDetails = () => {
 
                   {/* Show payment method if available */}
                   {payment.method && (
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       via {payment.method}
                     </div>
                   )}
 
                   {/* Show transaction ID if available */}
                   {payment.transactionId && (
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       Transaction: {payment.transactionId}
                     </div>
                   )}
@@ -1078,7 +1078,7 @@ const BookingDetails = () => {
                           onClick={handleDownloadReceipt}
                           disabled={isDownloadingReceipt}
                           variant="outline"
-                          className="flex items-center justify-center gap-2 border-cricket-green text-cricket-green hover:bg-cricket-green hover:text-white text-sm px-3 py-2 min-w-0 flex-1"
+                          className="flex items-center justify-center gap-2 border-emerald text-emerald hover:bg-emerald hover:text-white text-sm px-3 py-2 min-w-0 flex-1"
                         >
                           <Download className="w-4 h-4 flex-shrink-0" />
                           <span className="truncate">
@@ -1101,7 +1101,8 @@ const BookingDetails = () => {
                       </div>
                       <Button
                         onClick={() => setIsPaymentModalOpen(true)}
-                        className="w-full bg-cricket-green hover:bg-cricket-green/90"
+                        variant="glow"
+                        className="w-full"
                       >
                         Complete Payment
                       </Button>
@@ -1144,10 +1145,10 @@ const BookingDetails = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-center">
-                    <div className="text-2xl font-mono font-bold text-cricket-green">
+                    <div className="text-2xl font-mono font-bold text-emerald">
                       {booking.confirmation.confirmationCode}
                     </div>
-                    <div className="text-xs text-gray-600 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       Show this code at the ground
                     </div>
                   </div>

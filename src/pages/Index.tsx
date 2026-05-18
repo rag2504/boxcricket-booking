@@ -7,6 +7,7 @@ import LocationSelector from "@/components/LocationSelector";
 import FilterPanel from "@/components/FilterPanel";
 import NewBookingModal from "@/components/NewBookingModal";
 import type { City } from "@/lib/cities";
+import { useCity } from "@/contexts/CityContext";
 import { groundsApi } from "@/lib/api";
 import type { FilterOptions } from "@/components/FilterPanel";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,8 +54,12 @@ function mergeNotifications(oldNotifs: any[], newNotifs: any[]) {
 const Index = () => {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
-  const [selectedCity, setSelectedCity] = useState<City | undefined>();
-  const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false);
+  const {
+    selectedCity,
+    setSelectedCity,
+    isLocationSelectorOpen,
+    setLocationSelectorOpen,
+  } = useCity();
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedGround, setSelectedGround] = useState<any>(null);
@@ -73,10 +78,17 @@ const Index = () => {
   });
 
   const [isPageLoading, setIsPageLoading] = useState(true);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsPageLoading(false), 1200);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 300);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   const defaultFilters: FilterOptions = {
@@ -147,7 +159,7 @@ const Index = () => {
   useEffect(() => {
     if (!selectedCity) {
       const timer = setTimeout(() => {
-        setIsLocationSelectorOpen(true);
+        setLocationSelectorOpen(true);
       }, 1000);
       return () => clearTimeout(timer);
     }
@@ -179,14 +191,6 @@ const Index = () => {
       fetchGrounds();
     }
   }, [selectedCity, searchQuery, filters]);
-
-  // Restore selected city from localStorage on mount
-  useEffect(() => {
-    const savedCity = localStorage.getItem("boxcric_selected_city");
-    if (savedCity) {
-      setSelectedCity(JSON.parse(savedCity));
-    }
-  }, []);
 
   // Fetch user booking notifications
   useEffect(() => {
@@ -324,7 +328,6 @@ const Index = () => {
 
   const handleCitySelect = (city: City) => {
     setSelectedCity(city);
-    localStorage.setItem("boxcric_selected_city", JSON.stringify(city));
   };
 
   const handleSearch = (query: string) => {
@@ -393,7 +396,7 @@ const Index = () => {
 
       <Navbar
         selectedCity={selectedCity?.name}
-        onCitySelect={() => setIsLocationSelectorOpen(true)}
+        onCitySelect={() => setLocationSelectorOpen(true)}
         onSearch={handleSearch}
         onFilterToggle={() => setIsFilterPanelOpen(true)}
       />
@@ -401,7 +404,7 @@ const Index = () => {
       <HeroSection
         stats={heroStats}
         selectedCity={selectedCity}
-        onCitySelect={() => setIsLocationSelectorOpen(true)}
+        onCitySelect={() => setLocationSelectorOpen(true)}
       />
 
       <BookingTicker />
@@ -462,7 +465,7 @@ const Index = () => {
 
       <LocationSelector
         isOpen={isLocationSelectorOpen}
-        onClose={() => setIsLocationSelectorOpen(false)}
+        onClose={() => setLocationSelectorOpen(false)}
         onCitySelect={handleCitySelect}
         selectedCity={selectedCity}
       />
@@ -482,16 +485,21 @@ const Index = () => {
         onBookingCreated={handleBookingCreated}
       />
 
-      <motion.button
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        whileHover={{ scale: 1.1 }}
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-emerald text-white shadow-glow"
-        aria-label="Scroll to top"
-      >
-        <ArrowUp className="h-5 w-5" />
-      </motion.button>
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            whileHover={{ scale: 1.1 }}
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-emerald text-white shadow-glow"
+            aria-label="Scroll to top"
+          >
+            <ArrowUp className="h-5 w-5" />
+          </motion.button>
+        )}
+      </AnimatePresence>
     </PageShell>
   );
 };

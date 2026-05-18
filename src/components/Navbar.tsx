@@ -30,8 +30,10 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCity } from "@/contexts/CityContext";
 import AuthModal from "./AuthModal";
 import NotificationPanel from "./NotificationPanel";
+import LocationSelector from "./LocationSelector";
 
 interface NavbarProps {
   selectedCity?: string;
@@ -41,7 +43,7 @@ interface NavbarProps {
 }
 
 const Navbar = ({
-  selectedCity,
+  selectedCity: selectedCityLabel,
   onCitySelect,
   onSearch,
   onFilterToggle,
@@ -53,8 +55,16 @@ const Navbar = ({
   const [scrolled, setScrolled] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuth();
+  const {
+    selectedCity: contextCity,
+    setSelectedCity,
+    isLocationSelectorOpen,
+    setLocationSelectorOpen,
+  } = useCity();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const displayCityName = selectedCityLabel || contextCity?.name || "Select City";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -74,6 +84,14 @@ const Navbar = ({
   const handleAuthClick = (tab: "login" | "register") => {
     setAuthModalTab(tab);
     setIsAuthModalOpen(true);
+  };
+
+  const handleCityClick = () => {
+    if (onCitySelect) {
+      onCitySelect();
+      return;
+    }
+    setLocationSelectorOpen(true);
   };
 
   const handleLogout = () => {
@@ -163,12 +181,12 @@ const Navbar = ({
               <Button
                 variant="glass"
                 size="sm"
-                onClick={onCitySelect}
+                onClick={handleCityClick}
                 className="gap-2"
               >
                 <MapPin className="h-3.5 w-3.5 text-emerald" />
                 <span className="max-w-[120px] truncate">
-                  {selectedCity || "Select City"}
+                  {displayCityName}
                 </span>
                 <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
@@ -286,9 +304,9 @@ const Navbar = ({
               className="fixed right-0 top-0 bottom-0 z-50 w-[min(100vw-3rem,320px)] border-l border-white/10 bg-background/95 backdrop-blur-xl md:hidden overflow-y-auto"
             >
               <div className="flex flex-col gap-6 p-6 pt-24">
-                <Button variant="glass" onClick={onCitySelect} className="justify-start gap-3 h-12">
+                <Button variant="glass" onClick={handleCityClick} className="justify-start gap-3 h-12">
                   <MapPin className="h-4 w-4 text-emerald" />
-                  {selectedCity || "Select City"}
+                  {displayCityName}
                 </Button>
 
                 <form onSubmit={handleSearch} className="relative">
@@ -386,6 +404,15 @@ const Navbar = ({
         onClose={() => setIsAuthModalOpen(false)}
         defaultTab={authModalTab}
       />
+
+      {!onCitySelect && (
+        <LocationSelector
+          isOpen={isLocationSelectorOpen}
+          onClose={() => setLocationSelectorOpen(false)}
+          onCitySelect={setSelectedCity}
+          selectedCity={contextCity}
+        />
+      )}
     </>
   );
 };

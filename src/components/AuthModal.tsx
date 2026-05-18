@@ -177,10 +177,17 @@ const AuthModal = ({
   const inputClassName = "h-11 pl-10 border-white/[0.08] bg-white/[0.03] backdrop-blur-md";
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          handleClose();
+        }
+      }}
+    >
       <DialogContent
         className={cn(
-          "relative overflow-hidden border-white/[0.08] bg-[#0a0a0a]/95 p-0 shadow-glass-lg backdrop-blur-2xl sm:max-w-md",
+          "max-h-[calc(100vh-2rem)] overflow-y-auto border-white/[0.08] bg-[#0a0a0a]/95 p-0 shadow-glass-lg backdrop-blur-2xl sm:max-w-md",
           "before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-gradient-to-br before:from-emerald/10 before:via-transparent before:to-emerald/5",
         )}
       >

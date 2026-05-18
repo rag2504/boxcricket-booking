@@ -334,9 +334,9 @@ const PaymentModal = ({
         }
       }}
     >
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-emerald/25 bg-[#f7fff9] text-slate-950 shadow-[0_24px_80px_rgba(16,185,129,0.25)]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-center text-cricket-green flex items-center justify-center gap-3">
+          <DialogTitle className="text-2xl font-bold text-center text-slate-950 flex items-center justify-center gap-3">
             Complete Your Payment
             {temporaryHoldId && countdownTime > 0 && (
               <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1">
@@ -352,17 +352,19 @@ const PaymentModal = ({
         </DialogHeader>
 
         <div className="space-y-6">
-          <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-            <h3 className="font-semibold">{bookingData.ground?.name || "Ground"}</h3>
-            <p className="text-sm text-gray-600 flex items-center gap-2 mt-2">
-              <Calendar className="w-4 h-4" />
+          <div className="rounded-xl border border-emerald/25 bg-emerald-50 p-5 text-slate-900 shadow-sm">
+            <h3 className="font-semibold text-emerald-900">
+              {bookingData.ground?.name || "Ground"}
+            </h3>
+            <p className="text-sm text-slate-600 flex items-center gap-2 mt-2">
+              <Calendar className="w-4 h-4 text-emerald-700" />
               {formatDate(booking.bookingDate)}
-              <Clock className="w-4 h-4 ml-2" />
+              <Clock className="w-4 h-4 ml-2 text-emerald-700" />
               {booking.timeSlot.startTime} - {booking.timeSlot.endTime}
             </p>
           </div>
 
-          <div className="border rounded-xl p-5 space-y-2">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-2 text-slate-900 shadow-sm">
             <div className="flex justify-between text-sm">
               <span>Subtotal</span>
               <span>{formatCurrency(bookingData.baseAmount)}</span>
@@ -377,16 +379,16 @@ const PaymentModal = ({
               <span>Fee (2%)</span>
               <span>{formatCurrency(bookingData.taxes)}</span>
             </div>
-            <Separator />
-            <div className="flex justify-between text-lg font-semibold text-cricket-green">
+            <Separator className="bg-slate-200" />
+            <div className="flex justify-between text-lg font-semibold text-emerald-700">
               <span>Total</span>
               <span>{formatCurrency(bookingData.totalAmount)}</span>
             </div>
           </div>
 
-          <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl p-4">
-            <Shield className="w-5 h-5 text-green-600 mt-0.5" />
-            <p className="text-sm text-green-800">
+          <div className="flex items-start gap-3 rounded-xl border border-emerald/25 bg-emerald-50 p-4">
+            <Shield className="w-5 h-5 text-emerald-700 mt-0.5" />
+            <p className="text-sm text-emerald-900">
               Secured by Razorpay. UPI, cards, and net banking supported.
             </p>
           </div>
@@ -394,7 +396,7 @@ const PaymentModal = ({
           <Button
             onClick={handlePayment}
             disabled={isProcessing || bookingData.totalAmount < 1}
-            className="w-full h-14 text-lg bg-cricket-green hover:bg-cricket-green/90"
+            className="w-full h-14 text-lg bg-emerald text-white shadow-glow-sm hover:bg-emerald-light hover:shadow-glow"
           >
             {isProcessing ? (
               <span className="flex items-center gap-2">

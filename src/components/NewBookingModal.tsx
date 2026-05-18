@@ -813,7 +813,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
       >
         <DialogContent
           className={cn(
-            "max-w-4xl w-[95vw] sm:w-full rounded-2xl p-0 overflow-hidden border-white/[0.08] bg-[#0a0a0a]/95 shadow-glass-lg backdrop-blur-2xl max-h-[95vh] sm:max-h-[90vh]",
+            "max-w-4xl w-[95vw] sm:w-full rounded-2xl p-0 border-white/[0.08] bg-[#0a0a0a]/95 shadow-glass-lg backdrop-blur-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden",
             "before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-gradient-to-br before:from-emerald/10 before:via-transparent before:to-emerald/5",
           )}
         >
@@ -929,7 +929,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
           </div>
 
           {/* Step Content */}
-          <div className="relative z-10 px-6 sm:px-8 py-5 sm:py-6 max-h-[50vh] sm:max-h-[55vh] overflow-y-auto scrollbar-hide">
+          <div className="relative z-10 px-6 sm:px-8 py-5 sm:py-6 flex-1 overflow-y-auto scrollbar-hide" style={{ minHeight: 0 }}>
             <AnimatePresence mode="wait" custom={direction}>
               <motion.div
                 key={currentStep}

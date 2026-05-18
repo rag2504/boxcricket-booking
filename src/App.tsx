@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { CityProvider } from "@/contexts/CityContext";
 import Index from "./pages/Index";
 import Profile from "./pages/Profile";
 import Bookings from "./pages/Bookings";
@@ -20,6 +21,7 @@ import Notifications from "./pages/Notifications";
 import Footer from "./components/Footer";
 import MobileBottomNav from "./components/MobileBottomNav";
 import OwnerPanel from "./pages/OwnerPanel";
+import { RouteLoader } from "./components/ui/route-loader";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,32 +35,35 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <NotificationProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/profile/bookings" element={<Bookings />} />
-              <Route path="/favorites" element={<Favorites />} />
-              <Route path="/notifications" element={<Notifications />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/help" element={<Help />} />
-              <Route path="/ground/:id" element={<GroundDetails />} />
-              <Route path="/booking/:id" element={<BookingDetails />} />
-              <Route path="/owner-panel" element={<OwnerPanel />} />
-              <Route path="/payment/callback" element={<PaymentCallback />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <Footer />
-            <MobileBottomNav />
-          </BrowserRouter>
-        </TooltipProvider>
-      </NotificationProvider>
+      <CityProvider>
+        <NotificationProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <RouteLoader />
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/profile/bookings" element={<Bookings />} />
+                <Route path="/favorites" element={<Favorites />} />
+                <Route path="/notifications" element={<Notifications />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/help" element={<Help />} />
+                <Route path="/ground/:id" element={<GroundDetails />} />
+                <Route path="/booking/:id" element={<BookingDetails />} />
+                <Route path="/owner-panel" element={<OwnerPanel />} />
+                <Route path="/payment/callback" element={<PaymentCallback />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <Footer />
+              <MobileBottomNav />
+            </BrowserRouter>
+          </TooltipProvider>
+        </NotificationProvider>
+      </CityProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
