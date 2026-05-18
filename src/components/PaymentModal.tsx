@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreditCard, Shield, Clock, Calendar, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,11 @@ import { Separator } from "@/components/ui/separator";
 import { paymentsApi, bookingsApi, type ApiErrorBody } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { openRazorpayCheckout } from "@/lib/razorpayCheckout";
+import {
+  openRazorpayCheckout,
+  preloadRazorpayScript,
+  logRazorpayPointerEnvironment,
+} from "@/lib/razorpayCheckout";
 
 interface Booking {
   _id?: string;
@@ -89,6 +93,9 @@ const PaymentModal = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
+  /** Hides Radix Dialog while Razorpay is on screen so body scroll-lock / pointer-events cannot block the checkout iframe. */
+  const [suppressDialogForRzp, setSuppressDialogForRzp] = useState(false);
+  const closingForRzpRef = useRef(false);
   const [temporaryHoldId, setTemporaryHoldId] = useState<string | null>(null);
   const [holdExpiresAt, setHoldExpiresAt] = useState<Date | null>(null);
   const [countdownTime, setCountdownTime] = useState(0);
@@ -138,6 +145,18 @@ const PaymentModal = ({
       if (interval) clearInterval(interval);
     };
   }, [holdExpiresAt]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    preloadRazorpayScript().catch(() => {});
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      closingForRzpRef.current = false;
+      setSuppressDialogForRzp(false);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     return () => {
@@ -211,6 +230,14 @@ const PaymentModal = ({
       const amountPaise =
         order.amount_paise ?? order.amount ?? Math.round(bookingData.totalAmount * 100);
 
+      closingForRzpRef.current = true;
+      setSuppressDialogForRzp(true);
+      logRazorpayPointerEnvironment("payment_modal_before_dialog_suppress");
+      await new Promise<void>((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r()))
+      );
+      logRazorpayPointerEnvironment("payment_modal_after_raf_before_checkout");
+
       await openRazorpayCheckout({
         key,
         orderId: order.id,
@@ -272,6 +299,10 @@ const PaymentModal = ({
         toast.error(paymentErrorMessage(error));
       }
       setIsProcessing(false);
+    } finally {
+      closingForRzpRef.current = false;
+      setSuppressDialogForRzp(false);
+      logRazorpayPointerEnvironment("payment_modal_after_checkout_finally");
     }
   }, [
     booking,
@@ -287,17 +318,20 @@ const PaymentModal = ({
 
   return (
     <Dialog
-      open={isOpen}
+      open={isOpen && !suppressDialogForRzp}
       onOpenChange={(open) => {
         if (!open) {
+          if (closingForRzpRef.current) {
+            return;
+          }
           if (temporaryHoldId) {
             bookingsApi.releaseTemporaryHold(temporaryHoldId).catch(console.error);
             setTemporaryHoldId(null);
             setHoldExpiresAt(null);
           }
           if (!isProcessing) toast.info("Payment cancelled.");
+          onClose();
         }
-        onClose();
       }}
     >
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

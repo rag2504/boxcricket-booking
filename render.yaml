@@ -25,6 +25,11 @@ services:
         value: https://boxcricket-booking.onrender.com
       - key: FRONTEND_URL
         value: https://boxcricket-booking.vercel.app
+      # Optional: comma-separated extra origins. Localhost is allowed by default (see server/lib/corsConfig.js).
+      - key: CORS_ALLOW_LOCALHOST
+        value: "true"
+      - key: CORS_ORIGINS
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM

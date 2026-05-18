@@ -24,8 +24,65 @@ export interface OpenRazorpayCheckoutParams {
   onFailure?: (error: unknown) => void;
 }
 
+type RazorpayInstance = {
+  open: () => void;
+  close?: () => void;
+  on: (event: string, handler: (response: unknown) => void) => void;
+};
+
+function isRzpDebug(): boolean {
+  try {
+    return (
+      Boolean(import.meta.env?.DEV) ||
+      (typeof localStorage !== "undefined" &&
+        localStorage.getItem("RZP_DEBUG") === "1")
+    );
+  } catch {
+    return Boolean(import.meta.env?.DEV);
+  }
+}
+
+/** Call before opening checkout to log body / overlay state (enable with localStorage RZP_DEBUG=1 or dev build). */
+export function logRazorpayPointerEnvironment(phase: string): void {
+  if (!isRzpDebug() || typeof document === "undefined") return;
+
+  const body = document.body;
+  const b = getComputedStyle(body);
+  const radixOverlays = document.querySelectorAll(
+    "[data-radix-dialog-overlay][data-state='open']"
+  ).length;
+
+  console.info(`[RZP_DEBUG] ${phase}`, {
+    bodyPointerEvents: b.pointerEvents,
+    bodyOverflow: b.overflow,
+    radixDialogOpenOverlays: radixOverlays,
+    htmlHasPointerNone:
+      typeof document.documentElement !== "undefined" &&
+      getComputedStyle(document.documentElement).pointerEvents === "none",
+  });
+}
+
+let scriptLoadPromise: Promise<void> | null = null;
+
 function loadRazorpayScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Razorpay must run in the browser"));
+  }
+
+  if (window.Razorpay) {
+    return Promise.resolve();
+  }
+
+  if (scriptLoadPromise) {
+    return scriptLoadPromise;
+  }
+
+  scriptLoadPromise = new Promise((resolve, reject) => {
+    const finishOk = () => {
+      if (window.Razorpay) resolve();
+      else reject(new Error("Razorpay script loaded but window.Razorpay is missing"));
+    };
+
     if (window.Razorpay) {
       resolve();
       return;
@@ -33,27 +90,68 @@ function loadRazorpayScript(): Promise<void> {
 
     const existing = document.querySelector(
       `script[src="${RAZORPAY_SCRIPT_URL}"]`
-    );
+    ) as HTMLScriptElement | null;
+
     if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () =>
-        reject(new Error("Failed to load Razorpay checkout script"))
+      if (window.Razorpay) {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", finishOk, { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Failed to load Razorpay checkout script")),
+        { once: true }
       );
+      queueMicrotask(() => {
+        if (window.Razorpay) resolve();
+      });
+      // load may have fired before this listener was attached (SPA / cached script)
+      setTimeout(() => {
+        if (window.Razorpay) resolve();
+      }, 0);
       return;
     }
 
     const script = document.createElement("script");
     script.src = RAZORPAY_SCRIPT_URL;
     script.async = true;
-    script.onload = () => resolve();
+    script.onload = () => finishOk();
     script.onerror = () =>
       reject(new Error("Failed to load Razorpay from CDN"));
     document.head.appendChild(script);
+  }).finally(() => {
+    scriptLoadPromise = null;
   });
+
+  return scriptLoadPromise;
+}
+
+/** Preload checkout.js (safe to call from route/modal mount). */
+export function preloadRazorpayScript(): Promise<void> {
+  return loadRazorpayScript().catch(() => {});
+}
+
+let activeCheckout: RazorpayInstance | null = null;
+
+function destroyActiveCheckout(reason: string): void {
+  if (!activeCheckout) return;
+  try {
+    if (isRzpDebug()) {
+      console.info("[RZP_DEBUG] destroyActiveCheckout:", reason);
+    }
+    activeCheckout.close?.();
+  } catch (e) {
+    if (isRzpDebug()) {
+      console.warn("[RZP_DEBUG] active checkout close() failed:", e);
+    }
+  }
+  activeCheckout = null;
 }
 
 /**
  * Open Razorpay Checkout modal (CricBox branding).
+ * Closes any previous checkout instance first. Avoid stacking multiple modals.
  */
 export async function openRazorpayCheckout(
   params: OpenRazorpayCheckoutParams
@@ -86,9 +184,23 @@ export async function openRazorpayCheckout(
     name,
   });
 
+  logRazorpayPointerEnvironment("before_script_load");
+
   await loadRazorpayScript();
 
+  logRazorpayPointerEnvironment("after_script_load");
+
+  destroyActiveCheckout("before_new_open");
+
   return new Promise((resolve, reject) => {
+    let settled = false;
+
+    const cleanup = () => {
+      if (activeCheckout) {
+        activeCheckout = null;
+      }
+    };
+
     const options = {
       key,
       amount: amountPaise,
@@ -104,16 +216,23 @@ export async function openRazorpayCheckout(
         });
         try {
           await onSuccess(response);
+          settled = true;
+          cleanup();
           resolve();
         } catch (err) {
+          cleanup();
           reject(err);
         }
       },
       modal: {
         ondismiss: () => {
           console.log("💳 Razorpay popup closed");
+          logRazorpayPointerEnvironment("ondismiss");
+          cleanup();
           onDismiss?.();
-          reject(new Error("Payment cancelled"));
+          if (!settled) {
+            reject(new Error("Payment cancelled"));
+          }
         },
       },
       prefill: {
@@ -127,14 +246,25 @@ export async function openRazorpayCheckout(
     };
 
     try {
-      const paymentObject = new window.Razorpay(options);
+      logRazorpayPointerEnvironment("before_open()");
+      const paymentObject = new window.Razorpay(
+        options
+      ) as RazorpayInstance;
+      activeCheckout = paymentObject;
+
       paymentObject.on("payment.failed", (response: { error?: unknown }) => {
         console.error("❌ Razorpay payment.failed:", response);
         onFailure?.(response);
-        reject(new Error("Payment failed"));
+        cleanup();
+        if (!settled) {
+          reject(new Error("Payment failed"));
+        }
       });
+
       paymentObject.open();
+      logRazorpayPointerEnvironment("after_open()");
     } catch (err) {
+      cleanup();
       reject(err);
     }
   });
@@ -142,9 +272,6 @@ export async function openRazorpayCheckout(
 
 declare global {
   interface Window {
-    Razorpay: new (options: Record<string, unknown>) => {
-      open: () => void;
-      on: (event: string, handler: (response: unknown) => void) => void;
-    };
+    Razorpay: new (options: Record<string, unknown>) => RazorpayInstance;
   }
 }

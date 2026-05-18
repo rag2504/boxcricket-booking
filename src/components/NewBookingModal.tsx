@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +72,8 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [createdBooking, setCreatedBooking] = useState<any>(null);
   const [isCreatingBooking, setIsCreatingBooking] = useState(false);
+  const isPaymentModalOpenRef = useRef(isPaymentModalOpen);
+  isPaymentModalOpenRef.current = isPaymentModalOpen;
 
   // Generate next 7 days for quick date selection
   const getQuickDates = () => {
@@ -132,6 +134,13 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isOpen, user]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsPaymentModalOpen(false);
+      setCreatedBooking(null);
+    }
+  }, [isOpen]);
 
 
 
@@ -385,7 +394,15 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <>
+      <Dialog
+        open={isOpen && !isPaymentModalOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !isPaymentModalOpenRef.current) {
+            onClose();
+          }
+        }}
+      >
       <DialogContent 
         className="max-w-4xl w-[95vw] sm:w-full rounded-2xl sm:rounded-2xl p-0 overflow-hidden shadow-2xl border-0 bg-white max-h-[95vh] sm:max-h-[90vh]"
       >
@@ -689,16 +706,16 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Payment Modal */}
-        <PaymentModal
-          isOpen={isPaymentModalOpen}
-          onClose={handlePaymentModalClose}
-          booking={createdBooking}
-          onPaymentSuccess={handlePaymentSuccess}
-        />
       </DialogContent>
     </Dialog>
+
+      <PaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={handlePaymentModalClose}
+        booking={createdBooking}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
+    </>
   );
 };
 

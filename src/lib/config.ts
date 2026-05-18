@@ -9,7 +9,11 @@ export function getApiBaseUrl(): string {
 
   if (import.meta.env.DEV) {
     const devDefault = "http://localhost:3001/api";
-    console.log("[API] VITE_API_URL not set — using dev default:", devDefault);
+    console.log(
+      "[API] VITE_API_URL not set — using dev default:",
+      devDefault,
+      "(set VITE_API_URL=https://your-api.onrender.com/api to hit Render; ensure Render CORS allows http://localhost:8080)"
+    );
     return devDefault;
   }
 

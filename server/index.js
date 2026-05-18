@@ -24,97 +24,32 @@ import { logEmailConfig } from "./services/mailSender.js";
 import { startBookingCleanupService } from "./lib/bookingCleanup.js";
 import { startPeriodicCleanup } from "./lib/bookingUtils.js";
 import Booking from "./models/Booking.js";
+import { createCorsOriginChecker, logCorsStartup } from "./lib/corsConfig.js";
 
 // App and Server Initialization
 const app = express();
 const server = createServer(app);
+
+const corsOrigin = createCorsOriginChecker();
+
 const io = new Server(server, {
   cors: {
-    origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, etc.)
-      if (!origin) return callback(null, true);
-      
-      const allowedOrigins = process.env.NODE_ENV === 'production' 
-        ? [
-            process.env.FRONTEND_URL,
-            'https://boxcricket-booking.vercel.app',
-            'https://boxcric.netlify.app',
-            'https://box-host.netlify.app',
-            'https://box-9t8s1yy3n-tanishs-projects-fa8014b4.vercel.app',
-            'https://box-new.vercel.app',
-            'https://box-cash.vercel.app',
-            'https://box-junu.vercel.app'
-          ]
-        : [
-            "http://localhost:5173",
-            "http://localhost:8080",
-            "http://localhost:8081",
-            "http://localhost:8082",
-            "http://localhost:3000",
-            "http://localhost:4000",
-            "http://10.91.186.90:8080"
-          ];
-      
-      // Check if origin is in allowed list or matches Vercel pattern
-      if (allowedOrigins.includes(origin) || 
-          (process.env.NODE_ENV === 'production' && origin.match(/https:\/\/.*\.vercel\.app$/)) ||
-          process.env.NODE_ENV !== 'production') {
-        return callback(null, true);
-      }
-      
-      callback(new Error('Not allowed by CORS'));
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true
+    origin: corsOrigin,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    credentials: true,
   },
 });
 
-// Middleware
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = process.env.NODE_ENV === 'production' 
-      ? [
-          process.env.FRONTEND_URL,
-          'https://boxcricket-booking.vercel.app',
-          'https://boxcric.netlify.app',
-          'https://box-host.netlify.app',
-          'https://box-9t8s1yy3n-tanishs-projects-fa8014b4.vercel.app',
-          'https://box-new.vercel.app',
-          'https://box-cash.vercel.app',
-          'https://box-junu.vercel.app'
-        ]
-      : [
-          "http://localhost:5173",
-          "http://localhost:8080",
-          "http://localhost:8081",
-          "http://localhost:8082",
-          "http://localhost:3000",
-          "http://localhost:4000",
-          "http://10.91.186.90:8080"
-        ];
-    
-    // Check if origin is in allowed list
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    // Check if origin matches Vercel pattern (for production)
-    if (process.env.NODE_ENV === 'production' && origin.match(/https:\/\/.*\.vercel\.app$/)) {
-      return callback(null, true);
-    }
-    
-    // For development, be more permissive
-    if (process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-    
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-}));
+// Middleware — must run before routes so preflight OPTIONS and all responses get CORS headers
+app.use(
+  cors({
+    origin: corsOrigin,
+    credentials: true,
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    optionsSuccessStatus: 204,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -210,6 +145,16 @@ import { healthCheck } from "./lib/healthCheck.js";
 
 // Health Check endpoint
 app.get("/api/health", healthCheck);
+
+/** Lightweight connectivity check (used by SPA dev / monitoring). */
+app.get("/api/test", (req, res) => {
+  res.json({
+    success: true,
+    message: "API is reachable",
+    timestamp: new Date().toISOString(),
+    requestOrigin: req.headers.origin || null,
+  });
+});
 
 // Test endpoints for notification system validation
 app.post("/api/test-admin-notification", async (req, res) => {
@@ -449,6 +394,7 @@ console.log(`PORT: ${PORT}`);
 // Additional debug info
 console.log('Server binding to:', `${HOST}:${PORT}`);
 console.log('Running in environment:', process.env.NODE_ENV || 'development');
+logCorsStartup();
 logEmailConfig();
 
 server.listen(PORT, HOST, () => {

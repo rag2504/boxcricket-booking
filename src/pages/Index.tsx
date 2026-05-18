@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { isMongoObjectId } from "@/lib/utils";
 import { bookingsApi } from "@/lib/api";
-import { API_BASE_URL } from "@/lib/config";
+import { getApiBaseUrl } from "@/lib/config";
 
 // Demo data for testimonials
 const testimonials = [
@@ -178,19 +178,30 @@ const Index = () => {
     document.documentElement.classList.toggle('dark');
   };
 
-  // Test API connection on mount
+  // Verify API connectivity (uses /api/health — exists on server; /api/test is optional alias)
   useEffect(() => {
-    const testAPI = async () => {
+    const run = async () => {
+      const base = getApiBaseUrl().replace(/\/$/, "");
       try {
-        console.log("🧪 Testing API connection...");
-        const response = await fetch(`${API_BASE_URL}/test`);
-        const data = await response.json();
-        console.log("✅ API Test Result:", data);
+        console.log("🧪 Checking API:", `${base}/health`);
+        const res = await fetch(`${base}/health`, { method: "GET" });
+        const text = await res.text();
+        let data: unknown = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          data = { raw: text?.slice(0, 200) };
+        }
+        if (!res.ok) {
+          console.error("❌ API health HTTP", res.status, data);
+          return;
+        }
+        console.log("✅ API health OK:", data);
       } catch (error) {
-        console.error("❌ API Test Failed:", error);
+        console.error("❌ API health check failed:", error);
       }
     };
-    testAPI();
+    run();
   }, []);
 
   // Auto-open location selector on first visit

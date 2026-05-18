@@ -10,6 +10,13 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // Optional same-origin API during dev: set VITE_API_URL=/api in .env.local
+    proxy: {
+      "/api": {
+        target: process.env.VITE_DEV_API_PROXY || "http://localhost:3001",
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',

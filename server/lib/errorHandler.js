@@ -23,8 +23,9 @@ export class ApiError extends Error {
 export const errorConverter = (err, req, res, next) => {
   let error = err;
   if (!(error instanceof ApiError)) {
-    const statusCode = error.statusCode || error instanceof SyntaxError ? 400 : 500;
-    const message = error.message || 'Something went wrong';
+    const statusCode =
+      error.statusCode || (error instanceof SyntaxError ? 400 : 500);
+    const message = error.message || "Something went wrong";
     error = new ApiError(statusCode, message, false, err.stack);
   }
   next(error);

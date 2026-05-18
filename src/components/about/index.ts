@@ -1,0 +1,11 @@
+export { AboutHero } from "./AboutHero";
+export { AboutStory } from "./AboutStory";
+export { AboutWhyChoose } from "./AboutWhyChoose";
+export { AboutFeatures } from "./AboutFeatures";
+export { AboutVisionMission } from "./AboutVisionMission";
+export { AboutCommunity } from "./AboutCommunity";
+export { AboutGallery } from "./AboutGallery";
+export { AboutCTA } from "./AboutCTA";
+export { AboutFooter } from "./AboutFooter";
+export { FloatingElements } from "./FloatingElements";
+export { AnimatedCounter } from "./AnimatedCounter";
