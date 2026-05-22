@@ -1,6 +1,7 @@
 import express from 'express';
 import Ground from '../models/Ground.js';
 import Location from '../models/Location.js';
+import fetch from 'node-fetch';
 
 const router = express.Router();
 
@@ -10,11 +11,25 @@ router.post('/', async (req, res) => {
   try {
     const { messages } = req.body;
 
-    // Fetch dynamic context from DB
-    const grounds = await Ground.find({ status: 'active' }).select('name location price features policies').lean();
-    const locations = await Location.find().select('name state popular').lean();
+    if (!GROQ_API_KEY) {
+      console.error('❌ GROQ_API_KEY is missing from environment variables');
+      return res.status(500).json({
+        success: false,
+        message: 'GROQ_API_KEY is not configured in the backend environment. Please add it to your Render Environment Variables.',
+      });
+    }
 
-    const groundsContext = grounds.map(g => `- ${g.name} in ${g.location?.cityName}. Price: ${g.price?.perHour} ${g.price?.currency}/hr. Pitch: ${g.features?.pitchType || 'Standard'}`).join('\n');
+    // Fetch dynamic context from DB safely
+    let grounds = [];
+    let locations = [];
+    try {
+      grounds = await Ground.find({ status: 'active' }).select('name location price features policies').lean() || [];
+      locations = await Location.find().select('name state popular').lean() || [];
+    } catch (dbError) {
+      console.error('⚠️ DB Context fetch warning:', dbError.message);
+    }
+
+    const groundsContext = grounds.map(g => `- ${g.name} in ${g.location?.cityName || 'Unknown'}. Price: ${g.price?.perHour || 'Contact Us'} ${g.price?.currency || 'INR'}/hr. Pitch: ${g.features?.pitchType || 'Turf'}`).join('\n');
     const locationsContext = locations.map(l => `- ${l.name}, ${l.state}`).join('\n');
 
     const systemPrompt = `You are the AI Assistant for CricBox, a premium box cricket ground booking platform.
@@ -37,7 +52,7 @@ If a user specifically asks to talk to a human, a real agent, or an admin, or if
 
     const apiMessages = [
       { role: "system", content: systemPrompt },
-      ...messages
+      ...(messages || [])
     ];
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -57,16 +72,20 @@ If a user specifically asks to talk to a human, a real agent, or an admin, or if
     if (!response.ok) {
       const errText = await response.text();
       console.error("Groq API error:", errText);
-      throw new Error(`Groq API Error: ${response.status}`);
+      throw new Error(`Groq API Error (${response.status}): ${errText}`);
     }
 
     const data = await response.json();
-    const reply = data.choices[0].message.content;
+    const reply = data.choices?.[0]?.message?.content || 'I could not generate a response. Please try again.';
 
     res.json({ success: true, reply });
   } catch (error) {
-    console.error('Chat error:', error);
-    res.status(500).json({ success: false, message: 'Failed to process chat' });
+    console.error('Chat route error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to process chat: ' + error.message,
+      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
+    });
   }
 });
 
