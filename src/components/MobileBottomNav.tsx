@@ -1,4 +1,4 @@
-import { Home, Search, Calendar, User, Heart } from "lucide-react";
+import { Home, Info, HelpCircle, User, Heart } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -21,35 +21,30 @@ const MobileBottomNav = ({ notifications = 0 }: MobileBottomNavProps) => {
       requiresAuth: false,
     },
     {
-      icon: Search,
-      label: "Search",
-      path: "/search",
+      icon: Info,
+      label: "About",
+      path: "/about",
       requiresAuth: false,
     },
     {
-      icon: Calendar,
-      label: "Bookings",
-      path: "/profile/bookings",
-      requiresAuth: true,
-      badge: notifications,
+      icon: HelpCircle,
+      label: "Help",
+      path: "/help",
+      requiresAuth: false,
     },
     {
       icon: Heart,
       label: "Favorites",
       path: "/favorites",
-      requiresAuth: true,
+      requiresAuth: false,
     },
     {
       icon: User,
       label: "Profile",
       path: "/profile",
-      requiresAuth: true,
+      requiresAuth: false,
     },
   ];
-
-  const filteredItems = navItems.filter(
-    (item) => !item.requiresAuth || isAuthenticated,
-  );
 
   return (
     <motion.nav
@@ -71,7 +66,7 @@ const MobileBottomNav = ({ notifications = 0 }: MobileBottomNavProps) => {
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent rounded-t-2xl pointer-events-none" />
 
         <div className="relative flex items-stretch h-[4.25rem] px-1">
-          {filteredItems.map((item) => {
+          {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
 

@@ -303,45 +303,11 @@ const Navbar = ({
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="fixed right-0 top-0 bottom-0 z-50 w-[min(100vw-3rem,320px)] border-l border-white/10 bg-background/95 backdrop-blur-xl md:hidden overflow-y-auto"
             >
-              <div className="flex flex-col gap-6 p-6 pt-24">
+              <div className="flex flex-col gap-6 p-6 pt-24 pb-32">
                 <Button variant="glass" onClick={handleCityClick} className="justify-start gap-3 h-12">
                   <MapPin className="h-4 w-4 text-emerald" />
                   {displayCityName}
                 </Button>
-
-                <form onSubmit={handleSearch} className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search grounds..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </form>
-
-                {onFilterToggle && (
-                  <Button variant="outline" onClick={onFilterToggle} className="gap-2">
-                    <Filter className="h-4 w-4" /> Filters
-                  </Button>
-                )}
-
-                <div className="space-y-1">
-                  {navItems.map((item) => (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={cn(
-                        "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
-                        location.pathname === item.path
-                          ? "bg-emerald/10 text-emerald"
-                          : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
-                      )}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {item.name}
-                    </Link>
-                  ))}
-                </div>
 
                 {isAuthenticated && user ? (
                   <div className="space-y-1 border-t border-white/10 pt-4">
