@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import io from "socket.io-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { API_BASE_URL } from "@/lib/config";
 
 interface Message {
   id: string;
@@ -14,7 +15,17 @@ interface Message {
   timestamp: Date;
 }
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const getSocketUrl = (apiUrl: string) => {
+  try {
+    if (!apiUrl.startsWith("http")) return "";
+    const url = new URL(apiUrl);
+    return `${url.protocol}//${url.host}`;
+  } catch (e) {
+    return "";
+  }
+};
+
+const SOCKET_URL = getSocketUrl(API_BASE_URL);
 
 interface LiveChatWidgetProps {
   isOpen: boolean;
@@ -52,7 +63,9 @@ export default function LiveChatWidget({ isOpen, onClose }: LiveChatWidgetProps)
 
   useEffect(() => {
     if (chatMode === "human") {
-      const newSocket = io(BACKEND_URL);
+      const newSocket = io(SOCKET_URL, {
+        transports: ["websocket"],
+      });
       setSocket(newSocket);
 
       newSocket.on("connect", () => {
@@ -118,7 +131,7 @@ export default function LiveChatWidget({ isOpen, onClose }: LiveChatWidgetProps)
           }))
           .concat({ role: "user", content: newUserMsg.content });
 
-        const response = await fetch(`${BACKEND_URL}/api/chat`, {
+        const response = await fetch(`${API_BASE_URL}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ messages: apiMessages }),
