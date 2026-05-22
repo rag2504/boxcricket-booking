@@ -8,6 +8,106 @@ const router = express.Router();
 // --- ADMIN ROUTER ---
 // Minimal admin router exposing user listing for admin panel
 const adminRouter = express.Router();
+import Booking from "../models/Booking.js";
+
+adminRouter.get("/stats", async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ isActive: true });
+    
+    const totalGrounds = await Ground.countDocuments();
+    
+    const totalBookings = await Booking.countDocuments();
+    const pendingBookings = await Booking.countDocuments({ status: "pending" });
+    const confirmedBookings = await Booking.countDocuments({ status: "confirmed" });
+    
+    // Revenue calculation
+    const allBookings = await Booking.find({ status: { $in: ["confirmed", "completed"] } });
+    const totalRevenue = allBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+    
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const monthlyBookings = await Booking.find({ 
+      status: { $in: ["confirmed", "completed"] },
+      createdAt: { $gte: startOfMonth }
+    });
+    const monthlyRevenue = monthlyBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+
+    const recentBookings = await Booking.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate("userId", "name email")
+      .populate("groundId", "name location");
+
+    res.json({
+      success: true,
+      stats: {
+        totalUsers,
+        activeUsers,
+        totalGrounds,
+        totalBookings,
+        pendingBookings,
+        confirmedBookings,
+        totalRevenue,
+        monthlyRevenue,
+        recentBookings,
+      }
+    });
+  } catch (error) {
+    console.error("Admin stats error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch stats" });
+  }
+});
+
+import fetch from 'node-fetch';
+
+adminRouter.get("/ai-insights", async (req, res) => {
+  try {
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    if (!GROQ_API_KEY) {
+      return res.json({ success: true, insights: "AI insights are currently unavailable because the API key is not configured." });
+    }
+
+    const totalUsers = await User.countDocuments();
+    const totalBookings = await Booking.countDocuments();
+    const allBookings = await Booking.find({ status: { $in: ["confirmed", "completed"] } });
+    const totalRevenue = allBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+
+    const prompt = `You are an AI business analyst for CricBox, a premium box cricket booking platform.
+    Analyze these key metrics and provide a brief, professional, and actionable 2-paragraph executive summary for the admin dashboard.
+    
+    Data:
+    - Total Users: ${totalUsers}
+    - Total Bookings: ${totalBookings}
+    - Total Revenue: INR ${totalRevenue}
+    
+    Focus on business growth and user engagement. Do not include greetings. Use Markdown for emphasis.`;
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 300,
+      })
+    });
+
+    if (!response.ok) throw new Error("Failed to fetch from Groq");
+    const data = await response.json();
+    const insights = data.choices?.[0]?.message?.content || "No insights could be generated.";
+
+    res.json({ success: true, insights });
+  } catch (error) {
+    console.error("AI Insights error:", error);
+    res.status(500).json({ success: false, message: "Failed to generate AI insights" });
+  }
+});
 
 // List users with pagination and optional search
 adminRouter.get("/", async (req, res) => {

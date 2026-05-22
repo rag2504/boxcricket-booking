@@ -113,13 +113,53 @@ io.on("connection", (socket) => {
     console.log("🛡️ Admin joined admins room");
   });
 
-  socket.on("request-admin", (data) => {
+  socket.on("request-admin", async (data) => {
+    try {
+      const Chat = (await import('./models/Chat.js')).default;
+      await Chat.findOneAndUpdate(
+        { userId: data.userId },
+        { 
+          userId: data.userId, 
+          userName: data.name, 
+          userEmail: data.email, 
+          status: 'waiting_for_admin',
+          lastActive: new Date()
+        },
+        { upsert: true, new: true }
+      );
+    } catch (e) {
+      console.error('Failed to save chat request:', e);
+    }
     // Notify admins that a user needs help
     io.to("admins").emit("user-needs-help", data);
   });
 
-  socket.on("send-message", (data) => {
+  socket.on("send-message", async (data) => {
     const { room, message, sender } = data;
+    
+    const userId = room.replace('chat-', '');
+    try {
+      const Chat = (await import('./models/Chat.js')).default;
+      const chat = await Chat.findOneAndUpdate(
+        { userId },
+        {
+          $push: { messages: { role: sender, content: message, timestamp: new Date() } },
+          lastActive: new Date(),
+          ...(sender === 'user' ? { status: 'waiting_for_admin' } : { status: 'active' })
+        },
+        { upsert: true, new: true }
+      );
+
+      io.to("admins").emit("chat-updated", {
+        userId,
+        name: chat.userName || "Guest",
+        email: chat.userEmail || "",
+        timestamp: chat.lastActive
+      });
+    } catch (e) {
+      console.error('Failed to save chat message:', e);
+    }
+
     // Send to the specific chat room (either chat-userId)
     io.to(room).emit("new-message", { message, sender, timestamp: new Date() });
   });

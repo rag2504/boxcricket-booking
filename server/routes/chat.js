@@ -1,6 +1,7 @@
 import express from 'express';
 import Ground from '../models/Ground.js';
 import Location from '../models/Location.js';
+import Chat from '../models/Chat.js';
 import fetch from 'node-fetch';
 
 const router = express.Router();
@@ -76,9 +77,51 @@ If a user specifically asks to talk to a human, a real agent, or an admin, or if
     }
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || 'I could not generate a response. Please try again.';
+    let reply = data.choices?.[0]?.message?.content || 'I could not generate a response. Please try again.';
 
-    res.json({ success: true, reply });
+    const isTransfer = reply.includes("TRANSFER_TO_HUMAN");
+    if (isTransfer) {
+      reply = "Connecting you to a human agent. Please wait...";
+    }
+
+    const { userId, name, email } = req.body;
+    if (userId) {
+      const lastUserMsg = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+      
+      const newMessages = [];
+      if (lastUserMsg && lastUserMsg.role === 'user') {
+        newMessages.push({ role: 'user', content: lastUserMsg.content, timestamp: new Date() });
+      }
+      newMessages.push({ role: 'ai', content: reply, timestamp: new Date(Date.now() + 1000) });
+
+      const chat = await Chat.findOneAndUpdate(
+        { userId },
+        {
+          $setOnInsert: { userName: name || "Guest User", userEmail: email || "guest@example.com" },
+          $push: { messages: { $each: newMessages } },
+          lastActive: new Date(),
+          status: isTransfer ? 'waiting_for_admin' : 'active'
+        },
+        { upsert: true, new: true }
+      );
+
+      const io = req.app.get('io');
+      if (io) {
+        if (lastUserMsg && lastUserMsg.role === 'user') {
+          io.to(`chat-${userId}`).emit("new-message", { message: lastUserMsg.content, sender: "user", timestamp: new Date() });
+        }
+        io.to(`chat-${userId}`).emit("new-message", { message: reply, sender: "ai", timestamp: new Date() });
+
+        io.to("admins").emit("chat-updated", {
+          userId,
+          name: chat.userName,
+          email: chat.userEmail,
+          timestamp: chat.lastActive
+        });
+      }
+    }
+
+    res.json({ success: true, reply, isTransfer });
   } catch (error) {
     console.error('Chat route error:', error);
     res.status(500).json({ 
@@ -86,6 +129,25 @@ If a user specifically asks to talk to a human, a real agent, or an admin, or if
       message: 'Failed to process chat: ' + error.message,
       stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
     });
+  }
+});
+
+router.get('/admin/requests', async (req, res) => {
+  try {
+    const chats = await Chat.find({ status: { $in: ['active', 'waiting_for_admin'] } }).sort({ lastActive: -1 });
+    res.json({ success: true, chats });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/history/:userId', async (req, res) => {
+  try {
+    const chat = await Chat.findOne({ userId: req.params.userId });
+    if (!chat) return res.json({ success: true, messages: [], status: 'active' });
+    res.json({ success: true, messages: chat.messages, status: chat.status });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

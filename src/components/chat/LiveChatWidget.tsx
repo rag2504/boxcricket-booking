@@ -62,6 +62,38 @@ export default function LiveChatWidget({ isOpen, onClose }: LiveChatWidgetProps)
   }, [messages, isTyping]);
 
   useEffect(() => {
+    if (isOpen) {
+      const fetchHistory = async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/chat/history/${userId}`);
+          const data = await response.json();
+          if (data.success && data.messages && data.messages.length > 0) {
+            const historyMessages = data.messages.map((m: any) => ({
+              id: m._id || Date.now().toString() + Math.random(),
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(m.timestamp),
+            }));
+            
+            setMessages(prev => {
+              if (prev.length > 1) return prev; // already loaded
+              const isInitialAi = prev.length === 1 && prev[0].role === 'ai';
+              return isInitialAi ? historyMessages : [...prev, ...historyMessages];
+            });
+            
+            if (data.status === 'waiting_for_admin' || historyMessages.some((m: any) => m.role === 'admin')) {
+               setChatMode("human");
+            }
+          }
+        } catch (e) {
+          console.error("Failed to fetch chat history", e);
+        }
+      };
+      fetchHistory();
+    }
+  }, [userId, isOpen]);
+
+  useEffect(() => {
     if (chatMode === "human") {
       const newSocket = io(SOCKET_URL, {
         transports: ["websocket"],
@@ -70,21 +102,15 @@ export default function LiveChatWidget({ isOpen, onClose }: LiveChatWidgetProps)
 
       newSocket.on("connect", () => {
         newSocket.emit("join-chat", userId);
-        newSocket.emit("request-admin", {
-          userId,
-          name: user?.name || "Guest User",
-          email: user?.email || "guest@example.com",
-        });
         
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: "ai",
-            content: "Connecting you to a human agent. Please wait...",
-            timestamp: new Date(),
-          },
-        ]);
+        if (localStorage.getItem(`pendingAdminRequest_${userId}`)) {
+          newSocket.emit("request-admin", {
+            userId,
+            name: user?.name || "Guest User",
+            email: user?.email || "guest@example.com",
+          });
+          localStorage.removeItem(`pendingAdminRequest_${userId}`);
+        }
       });
 
       newSocket.on("new-message", (data: { message: string; sender: string }) => {
@@ -92,7 +118,7 @@ export default function LiveChatWidget({ isOpen, onClose }: LiveChatWidgetProps)
           setMessages((prev) => [
             ...prev,
             {
-              id: Date.now().toString(),
+              id: Date.now().toString() + Math.random().toString(),
               role: "admin",
               content: data.message,
               timestamp: new Date(),
@@ -134,19 +160,34 @@ export default function LiveChatWidget({ isOpen, onClose }: LiveChatWidgetProps)
         const response = await fetch(`${API_BASE_URL}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: apiMessages }),
+          body: JSON.stringify({ 
+            messages: apiMessages,
+            userId: userId,
+            name: user?.name || "Guest User",
+            email: user?.email || "guest@example.com"
+          }),
         });
 
         const data = await response.json();
         
         if (data.success) {
-          if (data.reply.includes("TRANSFER_TO_HUMAN")) {
+          if (data.isTransfer || data.reply.includes("TRANSFER_TO_HUMAN")) {
+            localStorage.setItem(`pendingAdminRequest_${userId}`, "true");
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString() + Math.random().toString(),
+                role: "ai",
+                content: "Connecting you to a human agent. Please wait...",
+                timestamp: new Date(),
+              },
+            ]);
             setChatMode("human");
           } else {
             setMessages((prev) => [
               ...prev,
               {
-                id: Date.now().toString(),
+                id: Date.now().toString() + Math.random().toString(),
                 role: "ai",
                 content: data.reply,
                 timestamp: new Date(),
