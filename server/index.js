@@ -19,6 +19,7 @@ import userRoutes, { adminRouter as adminUsersRouter } from "./routes/users.js";
 import paymentsRoutes from "./routes/payments.js";
 import { adminRouter as adminLocationsRouter } from "./routes/locations.js";
 import notificationRoutes, { adminRouter as adminNotificationsRouter } from "./routes/notifications.js";
+import chatRoutes from "./routes/chat.js";
 import { adminAuth } from "./middleware/adminAuth.js";
 import { logEmailConfig } from "./services/mailSender.js";
 import { startBookingCleanupService } from "./lib/bookingCleanup.js";
@@ -101,6 +102,28 @@ io.on("connection", (socket) => {
     console.log(`📍 User joined room: ground-${groundId}`);
   });
 
+  // Live Chat System
+  socket.on("join-chat", (userId) => {
+    socket.join(`chat-${userId}`);
+    console.log(`💬 User joined chat room: chat-${userId}`);
+  });
+
+  socket.on("admin-join", () => {
+    socket.join("admins");
+    console.log("🛡️ Admin joined admins room");
+  });
+
+  socket.on("request-admin", (data) => {
+    // Notify admins that a user needs help
+    io.to("admins").emit("user-needs-help", data);
+  });
+
+  socket.on("send-message", (data) => {
+    const { room, message, sender } = data;
+    // Send to the specific chat room (either chat-userId)
+    io.to(room).emit("new-message", { message, sender, timestamp: new Date() });
+  });
+
   socket.on("disconnect", () => {
     console.log("❌ Socket disconnected:", socket.id);
   });
@@ -139,6 +162,7 @@ app.use("/api/admin/locations", adminLocationsRouter);
 app.use("/api/notifications", notificationRoutes);
 // Protect admin notification routes with tolerant admin auth
 app.use("/api/admin/notifications", adminNotificationsRouter);
+app.use("/api/chat", chatRoutes);
 
 // Import health check middleware
 import { healthCheck } from "./lib/healthCheck.js";

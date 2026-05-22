@@ -13,27 +13,12 @@ import {
   Users,
   Shield,
   Clock,
-  Star,
-  AlertCircle,
-  CheckCircle,
   HelpCircle,
-  Zap,
-  Calendar,
   Smartphone,
   Wifi,
-  Car,
-  Utensils,
-  Dumbbell,
-  Camera,
-  FileText,
-  Globe,
-  TrendingUp,
-  Award,
-  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -44,15 +29,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import PageShell from "@/components/layout/PageShell";
-
+import { GlassCard } from "@/components/ui/glass-card";
+import { cn } from "@/lib/utils";
+import LiveChatWidget from "@/components/chat/LiveChatWidget";
 const Help = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [openFAQ, setOpenFAQ] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("all");
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const contactMethods = [
     {
-      icon: <Phone className="w-6 h-6 text-cricket-green" />,
+      icon: <Phone className="w-6 h-6 text-emerald" />,
       title: "Phone Support",
       description: "Call us for immediate assistance",
       contact: "+91 1800-BOXCRIC",
@@ -60,7 +49,7 @@ const Help = () => {
       action: "Call Now",
     },
     {
-      icon: <Mail className="w-6 h-6 text-cricket-yellow" />,
+      icon: <Mail className="w-6 h-6 text-emerald" />,
       title: "Email Support",
       description: "Send us your questions anytime",
       contact: "support@boxcric.com",
@@ -68,7 +57,7 @@ const Help = () => {
       action: "Send Email",
     },
     {
-      icon: <MessageCircle className="w-6 h-6 text-sky-blue" />,
+      icon: <MessageCircle className="w-6 h-6 text-emerald" />,
       title: "Live Chat",
       description: "Chat with our support team",
       contact: "Available in app",
@@ -80,73 +69,73 @@ const Help = () => {
   const categories = [
     {
       id: "booking",
-      icon: <Book className="w-6 h-6" />,
+      icon: <Book className="w-5 h-5" />,
       title: "Booking & Reservations",
       description: "How to book grounds, modify bookings, and cancellations",
-      color: "bg-cricket-green/10 text-cricket-green",
+      color: "bg-emerald/10 text-emerald border-emerald/20",
       faqCount: 8,
       popular: true,
     },
     {
       id: "payment",
-      icon: <CreditCard className="w-6 h-6" />,
+      icon: <CreditCard className="w-5 h-5" />,
       title: "Payments & Refunds",
       description: "Payment methods, refund policies, and billing issues",
-      color: "bg-cricket-yellow/10 text-cricket-yellow",
+      color: "bg-emerald/10 text-emerald border-emerald/20",
       faqCount: 6,
       popular: false,
     },
     {
       id: "grounds",
-      icon: <MapPin className="w-6 h-6" />,
+      icon: <MapPin className="w-5 h-5" />,
       title: "Ground Information",
       description: "Ground details, amenities, and location guidance",
-      color: "bg-sky-blue/10 text-sky-blue",
+      color: "bg-emerald/10 text-emerald border-emerald/20",
       faqCount: 7,
       popular: true,
     },
     {
       id: "account",
-      icon: <Settings className="w-6 h-6" />,
+      icon: <Settings className="w-5 h-5" />,
       title: "Account & Settings",
       description: "Profile management, notifications, and app settings",
-      color: "bg-purple-100 text-purple-600",
+      color: "bg-emerald/10 text-emerald border-emerald/20",
       faqCount: 5,
       popular: false,
     },
     {
       id: "safety",
-      icon: <Shield className="w-6 h-6" />,
+      icon: <Shield className="w-5 h-5" />,
       title: "Safety & Security",
       description: "Safety measures, insurance, and emergency procedures",
-      color: "bg-red-100 text-red-600",
+      color: "bg-emerald/10 text-emerald border-emerald/20",
       faqCount: 4,
       popular: false,
     },
     {
       id: "technical",
-      icon: <Smartphone className="w-6 h-6" />,
+      icon: <Smartphone className="w-5 h-5" />,
       title: "Technical Support",
       description: "App issues, website problems, and technical assistance",
-      color: "bg-indigo-100 text-indigo-600",
+      color: "bg-emerald/10 text-emerald border-emerald/20",
       faqCount: 6,
       popular: false,
     },
     {
       id: "amenities",
-      icon: <Wifi className="w-6 h-6" />,
+      icon: <Wifi className="w-5 h-5" />,
       title: "Amenities & Services",
       description: "Available facilities, equipment, and additional services",
-      color: "bg-orange-100 text-orange-600",
+      color: "bg-emerald/10 text-emerald border-emerald/20",
       faqCount: 5,
       popular: false,
     },
     {
       id: "community",
-      icon: <Users className="w-6 h-6" />,
+      icon: <Users className="w-5 h-5" />,
       title: "Community & Events",
       description: "Tournaments, leagues, and community features",
-      color: "bg-pink-100 text-pink-600",
+      color: "bg-emerald/10 text-emerald border-emerald/20",
       faqCount: 4,
       popular: false,
     },
@@ -487,7 +476,7 @@ const Help = () => {
 
   const filteredFAQs = (() => {
     let filtered = faqs;
-    
+
     // First apply search filter if there's a search query
     if (searchQuery) {
       filtered = filtered.filter(
@@ -495,10 +484,13 @@ const Help = () => {
           faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
           faq.answer.toLowerCase().includes(searchQuery.toLowerCase()) ||
           faq.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          categories.find(c => c.id === faq.category)?.title.toLowerCase().includes(searchQuery.toLowerCase())
+          categories
+            .find((c) => c.id === faq.category)
+            ?.title.toLowerCase()
+            .includes(searchQuery.toLowerCase())
       );
     }
-    
+
     // Then apply category filter if a category is selected
     if (selectedCategory && !searchQuery) {
       filtered = filtered.filter((faq) => faq.category === selectedCategory);
@@ -509,25 +501,33 @@ const Help = () => {
   const popularFAQs = faqs.filter((faq) => faq.popular);
 
   const handleCategoryClick = (categoryId: string) => {
-    setSelectedCategory(selectedCategory === categoryId ? null : categoryId);
+    const isAlreadySelected = selectedCategory === categoryId;
+    setSelectedCategory(isAlreadySelected ? null : categoryId);
     setSearchQuery("");
+    setActiveTab("all");
+    
+    // Smoothly scroll to the FAQ section
+    setTimeout(() => {
+      document.getElementById("faq-section")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
   };
 
   const clearAllFilters = () => {
     setSearchQuery("");
     setSelectedCategory(null);
+    setActiveTab("all");
   };
 
   const handleLiveChat = () => {
-    toast.info("Live Chat feature coming soon! Stay tuned for this exciting feature.", {
-      description: "We're working hard to bring you real-time chat support.",
-      duration: 4000,
-    });
+    setIsChatOpen(true);
   };
 
   const handleSendEmail = () => {
-    toast.info("Send to oneloki05@gmail.com", {
-      description: "Please send your support request to this email address",
+    toast.info("Support Email", {
+      description: "Please send your query to support@boxcric.com (or oneloki05@gmail.com).",
       duration: 4000,
     });
   };
@@ -537,50 +537,61 @@ const Help = () => {
       <Navbar />
 
       <div className="container-premium section-padding max-w-6xl">
-        <div className="text-center mb-12">
-          <h1 className="heading-display text-4xl sm:text-5xl mb-4">Help & Support</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Find answers to your questions or get in touch with our support team.
+        {/* Header Hero Section */}
+        <div className="text-center mb-16 relative">
+          <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-12 w-72 h-72 bg-emerald/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <span className="inline-flex items-center gap-2 rounded-full border border-emerald/20 bg-emerald/10 px-4 py-1.5 text-xs font-medium text-emerald mb-6">
+            <HelpCircle className="h-3.5 w-3.5" />
+            Support Center
+          </span>
+          <h1 className="heading-display text-4xl sm:text-5xl lg:text-6xl mb-4 text-balance">
+            How can we <span className="gradient-text">help you?</span>
+          </h1>
+          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Find answers to your questions, explore ground policies, or get in touch with our team.
           </p>
         </div>
 
-        {/* Search */}
-        <div className="max-w-2xl mx-auto mb-12">
+        {/* Elegant Search Bar */}
+        <div className="max-w-2xl mx-auto mb-16">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+              <Search className="w-5 h-5 text-emerald" />
+            </div>
             <Input
               type="text"
-              placeholder="Search for help articles, FAQs, or topics..."
+              placeholder="Search ground booking, payments, cancellation policies..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 if (e.target.value) {
-                  setSelectedCategory(null); // Clear category when searching
+                  setSelectedCategory(null);
                 }
               }}
-              className="pl-12 pr-4 py-3 text-lg border-2 border-gray-200 focus:border-cricket-green"
+              className="pl-12 pr-10 py-4 h-14 text-base bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-2xl focus:border-emerald focus:ring-2 focus:ring-emerald/20 text-foreground placeholder:text-muted-foreground/50 transition-all duration-300 shadow-glass"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
                 ✕
               </button>
             )}
           </div>
           {searchQuery && (
-            <div className="text-center mt-2 text-sm text-gray-600">
-              Found {filteredFAQs.length} result{filteredFAQs.length !== 1 ? 's' : ''} for "{searchQuery}"
+            <div className="text-center mt-3 text-sm text-muted-foreground">
+              Found {filteredFAQs.length} result{filteredFAQs.length !== 1 ? "s" : ""} for "{searchQuery}"
             </div>
           )}
           {(searchQuery || selectedCategory) && (
-            <div className="text-center mt-2">
+            <div className="text-center mt-4">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={clearAllFilters}
-                className="text-cricket-green border-cricket-green hover:bg-cricket-green/10"
+                className="text-emerald border-emerald/20 hover:border-emerald hover:bg-emerald/5"
               >
                 Clear All Filters
               </Button>
@@ -588,294 +599,394 @@ const Help = () => {
           )}
         </div>
 
-        {/* Contact Methods */}
-        <section className="mb-16">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">
-            Get in Touch
-          </h2>
+        {/* Contact Methods Section */}
+        <section className="mb-20">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl font-bold font-display text-foreground">Get in Touch</h2>
+            <p className="text-sm text-muted-foreground mt-2">Need personal assistance? We are here to support you 24/7.</p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {contactMethods.map((method, index) => (
-              <Card
+              <GlassCard
                 key={index}
-                className="border-2 border-gray-200 hover:border-cricket-green/50 transition-colors duration-200"
+                hover
+                glow
+                className="p-6 text-center flex flex-col justify-between border-white/[0.08]"
               >
-                <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 bg-gradient-cricket rounded-full flex items-center justify-center mx-auto mb-4">
+                <div>
+                  <div className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-6 shadow-glass">
                     {method.icon}
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  <h3 className="text-xl font-semibold text-foreground mb-2 font-display">
                     {method.title}
                   </h3>
-                  <p className="text-gray-600 mb-3">{method.description}</p>
-                  <div className="text-sm text-gray-700 mb-1 font-medium">
+                  <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                    {method.description}
+                  </p>
+                </div>
+                <div>
+                  <div className="text-base text-emerald font-semibold mb-1 font-display">
                     {method.contact}
                   </div>
-                  <div className="text-xs text-gray-500 mb-4">
+                  <div className="text-xs text-muted-foreground/70 mb-6">
                     {method.availability}
                   </div>
                   <Button
                     size="sm"
-                    className="bg-cricket-green hover:bg-cricket-green/90"
-                    onClick={method.action === "Start Chat" ? handleLiveChat : undefined}
+                    variant={method.action === "Start Chat" ? "glow" : "outline"}
+                    className="w-full"
+                    onClick={
+                      method.action === "Start Chat"
+                        ? handleLiveChat
+                        : method.action === "Send Email"
+                        ? handleSendEmail
+                        : () => window.open(`tel:${method.contact.replace(/\s+/g, "")}`)
+                    }
                   >
                     {method.action}
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </GlassCard>
             ))}
           </div>
         </section>
 
-        {/* Help Categories */}
-        <section className="mb-16">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">
-            Browse by Category
-          </h2>
+        {/* Browse by Category Section */}
+        <section className="mb-20">
+          <div className="flex items-center justify-between mb-10">
+            <div>
+              <h2 className="text-2xl font-bold font-display text-foreground">Browse by Category</h2>
+              <p className="text-sm text-muted-foreground mt-1">Select a topic to filter related questions</p>
+            </div>
             {selectedCategory && (
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setSelectedCategory(null)}
-                className="text-cricket-green border-cricket-green hover:bg-cricket-green/10"
+                className="text-emerald border-emerald/20 hover:border-emerald hover:bg-emerald/5"
               >
-                View All Categories
+                View All
               </Button>
             )}
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {categories.map((category, index) => (
-              <Card
-                key={index}
-                className={`border-2 transition-all duration-200 cursor-pointer hover:shadow-lg ${
-                  selectedCategory === category.id
-                    ? "border-cricket-green bg-cricket-green/5"
-                    : "border-gray-200 hover:border-cricket-green/50"
-                }`}
-                onClick={() => handleCategoryClick(category.id)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start space-x-3">
-                    <div
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${category.color}`}
-                    >
-                      {category.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="text-sm font-semibold text-gray-900 truncate">
-                        {category.title}
-                      </h3>
-                        {category.popular && (
-                          <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-600">
-                            Popular
-                          </Badge>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {categories.map((category, index) => {
+              const isSelected = selectedCategory === category.id;
+              return (
+                <GlassCard
+                  key={index}
+                  hover
+                  className={cn(
+                    "p-5 cursor-pointer border transition-all duration-300 flex flex-col justify-between h-full",
+                    isSelected
+                      ? "border-emerald/50 bg-emerald/[0.06] shadow-glow-sm"
+                      : "border-white/[0.08] hover:border-emerald/30 hover:bg-white/[0.06]"
+                  )}
+                  onClick={() => handleCategoryClick(category.id)}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center",
+                          isSelected ? "bg-emerald text-white" : "bg-emerald/10 text-emerald"
                         )}
+                      >
+                        {category.icon}
                       </div>
-                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">
-                        {category.description}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
-                          {category.faqCount} FAQs
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
-                      </div>
+                      {category.popular && (
+                        <Badge className="bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[10px]">
+                          Popular
+                        </Badge>
+                      )}
                     </div>
+                    <h3 className="font-display font-semibold text-foreground text-sm sm:text-base mb-2">
+                      {category.title}
+                    </h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mb-4">
+                      {category.description}
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                  <div className="flex items-center justify-between pt-3 border-t border-white/[0.05] mt-auto">
+                    <span className="text-xs text-muted-foreground/80 font-medium">
+                      {category.faqCount} FAQs
+                    </span>
+                    <ChevronRight
+                      className={cn(
+                        "w-4 h-4 transition-transform duration-300",
+                        isSelected ? "text-emerald translate-x-1" : "text-muted-foreground/50"
+                      )}
+                    />
+                  </div>
+                </GlassCard>
+              );
+            })}
           </div>
         </section>
 
-        {/* FAQs with Tabs */}
-        <section className="mb-16">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">
-            Frequently Asked Questions
-          </h2>
-          
-          <Tabs defaultValue="all" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-8">
-              <TabsTrigger value="all">All Questions</TabsTrigger>
-              <TabsTrigger value="popular">Popular</TabsTrigger>
-              <TabsTrigger value="recent">Recent</TabsTrigger>
-              <TabsTrigger value="category">By Category</TabsTrigger>
+        {/* FAQs Tabs Section */}
+        <section id="faq-section" className="mb-20 scroll-mt-24">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold font-display text-foreground">Frequently Asked Questions</h2>
+            <p className="text-sm text-muted-foreground mt-2">Find instant answers to common booking and ground query topics</p>
+          </div>
+
+          {/* Fast Search Bar inside FAQ section */}
+          <div className="max-w-2xl mx-auto mb-10 px-4 sm:px-0">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                <Search className="w-4 h-4 text-emerald" />
+              </div>
+              <Input
+                type="text"
+                placeholder="Fast search within FAQs (e.g., refund, slots, rain...)"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  if (e.target.value) {
+                    setSelectedCategory(null);
+                    setActiveTab("all"); // Auto-switch to All Questions tab when typing
+                  }
+                }}
+                className="pl-11 pr-10 py-3 h-12 text-sm bg-white/[0.02] border border-white/[0.08] rounded-xl focus:border-emerald focus:ring-2 focus:ring-emerald/20 text-foreground placeholder:text-muted-foreground/50 transition-all duration-300 shadow-glass"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto p-1 bg-white/[0.02] border border-white/[0.08] rounded-2xl mb-8">
+              <TabsTrigger
+                value="all"
+                className="rounded-xl py-3 text-sm font-medium transition-all data-[state=active]:bg-emerald data-[state=active]:text-white"
+              >
+                All Questions
+              </TabsTrigger>
+              <TabsTrigger
+                value="popular"
+                className="rounded-xl py-3 text-sm font-medium transition-all data-[state=active]:bg-emerald data-[state=active]:text-white"
+              >
+                Popular FAQs
+              </TabsTrigger>
+              <TabsTrigger
+                value="recent"
+                className="rounded-xl py-3 text-sm font-medium transition-all data-[state=active]:bg-emerald data-[state=active]:text-white"
+              >
+                Recent Updates
+              </TabsTrigger>
+              <TabsTrigger
+                value="category"
+                className="rounded-xl py-3 text-sm font-medium transition-all data-[state=active]:bg-emerald data-[state=active]:text-white"
+              >
+                By Category
+              </TabsTrigger>
             </TabsList>
 
-                        <TabsContent value="all" className="space-y-4">
-              <div className="max-w-4xl mx-auto">
+            {/* ALL QUESTIONS TAB */}
+            <TabsContent value="all" className="space-y-4 outline-none">
+              <div className="max-w-4xl mx-auto space-y-4">
+                {filteredFAQs.length > 0 ? (
+                  filteredFAQs.map((faq) => {
+                    const isOpen = openFAQ === faq.id;
+                    return (
+                      <GlassCard
+                        key={faq.id}
+                        className={cn(
+                          "overflow-hidden border transition-all duration-300",
+                          isOpen ? "border-emerald/30 bg-white/[0.05]" : "border-white/[0.08]"
+                        )}
+                      >
+                        <Collapsible
+                          open={isOpen}
+                          onOpenChange={() => setOpenFAQ(isOpen ? null : faq.id)}
+                        >
+                          <CollapsibleTrigger asChild>
+                            <div className="flex items-center justify-between p-5 cursor-pointer hover:bg-white/[0.01] transition-colors duration-200">
+                              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Badge className="bg-emerald/10 text-emerald border border-emerald/20 text-[10px]">
+                                    {categories.find((c) => c.id === faq.category)?.title}
+                                  </Badge>
+                                  {faq.popular && (
+                                    <Badge className="bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[10px]">
+                                      Popular
+                                    </Badge>
+                                  )}
+                                </div>
+                                <span className="font-display font-semibold text-foreground text-left text-sm sm:text-base leading-snug">
+                                  {faq.question}
+                                </span>
+                              </div>
+                              <div className="ml-4 shrink-0">
+                                {isOpen ? (
+                                  <ChevronDown className="w-5 h-5 text-emerald" />
+                                ) : (
+                                  <ChevronRight className="w-5 h-5 text-muted-foreground/60" />
+                                )}
+                              </div>
+                            </div>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="px-5 pb-5 pt-1 text-muted-foreground leading-relaxed text-sm sm:text-base border-t border-white/[0.04]">
+                              {faq.answer}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </GlassCard>
+                    );
+                  })
+                ) : (
+                  <GlassCard className="p-12 text-center border-white/[0.08]">
+                    <Search className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-foreground mb-2 font-display">
+                      No matching answers found
+                    </h3>
+                    <p className="text-muted-foreground mb-6 max-w-md mx-auto text-sm">
+                      We couldn't find any results for "{searchQuery}". Try editing your query or search term, or select one of the core categories above.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={clearAllFilters}
+                      className="text-emerald border-emerald/20 hover:border-emerald hover:bg-emerald/5"
+                    >
+                      Clear Filters
+                    </Button>
+                  </GlassCard>
+                )}
+              </div>
+            </TabsContent>
 
-                                {filteredFAQs.length > 0 ? (
-                  filteredFAQs.map((faq) => (
-                    <Card key={faq.id} className="border border-gray-200">
+            {/* POPULAR TAB */}
+            <TabsContent value="popular" className="space-y-4 outline-none">
+              <div className="max-w-4xl mx-auto space-y-4">
+                {popularFAQs.map((faq) => {
+                  const isOpen = openFAQ === faq.id;
+                  return (
+                    <GlassCard
+                      key={faq.id}
+                      className={cn(
+                        "overflow-hidden border transition-all duration-300",
+                        isOpen ? "border-emerald/30 bg-white/[0.05]" : "border-white/[0.08]"
+                      )}
+                    >
                       <Collapsible
-                        open={openFAQ === faq.id}
-                        onOpenChange={() =>
-                          setOpenFAQ(openFAQ === faq.id ? null : faq.id)
-                        }
+                        open={isOpen}
+                        onOpenChange={() => setOpenFAQ(isOpen ? null : faq.id)}
                       >
                         <CollapsibleTrigger asChild>
-                          <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors duration-200">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <Badge variant="secondary" className="text-xs">
-                                  {categories.find(c => c.id === faq.category)?.title}
+                          <div className="flex items-center justify-between p-5 cursor-pointer hover:bg-white/[0.01] transition-colors duration-200">
+                            <div className="flex flex-col md:flex-row md:items-center gap-3">
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Badge className="bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[10px]">
+                                  Popular
                                 </Badge>
-                                {faq.popular && (
-                                  <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-600">
-                                    Popular
-                                  </Badge>
-                                )}
-                                <CardTitle className="text-left text-lg">
-                                  {faq.question}
-                                </CardTitle>
+                                <Badge className="bg-emerald/10 text-emerald border border-emerald/20 text-[10px]">
+                                  {categories.find((c) => c.id === faq.category)?.title}
+                                </Badge>
                               </div>
-                              {openFAQ === faq.id ? (
-                                <ChevronDown className="w-5 h-5 text-gray-500" />
+                              <span className="font-display font-semibold text-foreground text-left text-sm sm:text-base leading-snug">
+                                {faq.question}
+                              </span>
+                            </div>
+                            <div className="ml-4 shrink-0">
+                              {isOpen ? (
+                                <ChevronDown className="w-5 h-5 text-emerald" />
                               ) : (
-                                <ChevronRight className="w-5 h-5 text-gray-500" />
+                                <ChevronRight className="w-5 h-5 text-muted-foreground/60" />
                               )}
                             </div>
-                          </CardHeader>
+                          </div>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
-                          <CardContent className="pt-0">
-                            <p className="text-gray-700 leading-relaxed">
-                              {faq.answer}
-                            </p>
-                          </CardContent>
+                          <div className="px-5 pb-5 pt-1 text-muted-foreground leading-relaxed text-sm sm:text-base border-t border-white/[0.04]">
+                            {faq.answer}
+                          </div>
                         </CollapsibleContent>
                       </Collapsible>
-                    </Card>
-                  ))
-                                ) : (
-                  <Card>
-                    <CardContent className="p-12 text-center">
-                      <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        No results found
-                      </h3>
-                      <p className="text-gray-600 mb-4">
-                        We couldn't find any help articles matching "{searchQuery}".
-                        Try different keywords, check spelling, or contact our support team.
-                      </p>
-                      <Button
-                        variant="outline"
-                        onClick={clearAllFilters}
-                        className="text-cricket-green border-cricket-green hover:bg-cricket-green/10"
-                      >
-                        Clear All Filters
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-          </div>
-            </TabsContent>
-
-            <TabsContent value="popular" className="space-y-4">
-              <div className="max-w-4xl mx-auto">
-                {popularFAQs.map((faq) => (
-                  <Card key={faq.id} className="border border-gray-200">
-                    <Collapsible
-                      open={openFAQ === faq.id}
-                      onOpenChange={() =>
-                        setOpenFAQ(openFAQ === faq.id ? null : faq.id)
-                      }
-                    >
-                      <CollapsibleTrigger asChild>
-                        <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors duration-200">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-600">
-                                Popular
-                              </Badge>
-                              <Badge variant="secondary" className="text-xs">
-                                {categories.find(c => c.id === faq.category)?.title}
-                              </Badge>
-                              <CardTitle className="text-left text-lg">
-                                {faq.question}
-                              </CardTitle>
-                            </div>
-                            {openFAQ === faq.id ? (
-                              <ChevronDown className="w-5 h-5 text-gray-500" />
-                            ) : (
-                              <ChevronRight className="w-5 h-5 text-gray-500" />
-                            )}
-                          </div>
-                        </CardHeader>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <CardContent className="pt-0">
-                          <p className="text-gray-700 leading-relaxed">
-                            {faq.answer}
-                          </p>
-                        </CardContent>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </Card>
-                ))}
+                    </GlassCard>
+                  );
+                })}
               </div>
             </TabsContent>
 
-            <TabsContent value="recent" className="space-y-4">
+            {/* RECENT TAB */}
+            <TabsContent value="recent" className="space-y-4 outline-none">
               <div className="max-w-4xl mx-auto">
-                <Card>
-                  <CardContent className="p-12 text-center">
-                    <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      Recent Questions
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      This section will show recently added FAQs and trending questions.
-                      Coming soon!
-                    </p>
-                  </CardContent>
-                </Card>
+                <GlassCard className="p-12 text-center border-white/[0.08]">
+                  <Clock className="w-12 h-12 text-emerald mx-auto mb-4 animate-pulse" />
+                  <h3 className="text-xl font-semibold text-foreground mb-2 font-display">
+                    Recent Updates & FAQs
+                  </h3>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto text-sm">
+                    This section highlights newly added policy updates, tournament announcements, and seasonal rain-reschedule guidelines.
+                  </p>
+                  <Badge variant="outline" className="text-emerald border-emerald/20 bg-emerald/5 px-3 py-1">
+                    Feature Coming Soon
+                  </Badge>
+                </GlassCard>
               </div>
             </TabsContent>
 
-            <TabsContent value="category" className="space-y-4">
+            {/* BY CATEGORY TAB */}
+            <TabsContent value="category" className="space-y-4 outline-none">
               <div className="max-w-4xl mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {categories.map((category) => (
-                    <Card key={category.id} className="border border-gray-200">
-                      <CardHeader>
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${category.color}`}>
+                    <GlassCard
+                      key={category.id}
+                      className="border border-white/[0.08] p-6 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center space-x-3 mb-4">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald/10 text-emerald shrink-0">
                             {category.icon}
                           </div>
                           <div>
-                            <CardTitle className="text-lg">{category.title}</CardTitle>
-                            <p className="text-sm text-gray-600">{category.faqCount} questions</p>
+                            <h4 className="font-display font-semibold text-foreground text-base sm:text-lg">
+                              {category.title}
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                              {category.faqCount} questions
+                            </p>
                           </div>
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
+                        <div className="space-y-3 mb-6">
                           {faqs
                             .filter((faq) => faq.category === category.id)
                             .slice(0, 3)
                             .map((faq) => (
                               <div
                                 key={faq.id}
-                                className="text-sm text-gray-700 cursor-pointer hover:text-cricket-green"
-                                onClick={() => setOpenFAQ(openFAQ === faq.id ? null : faq.id)}
+                                className="text-sm text-muted-foreground cursor-pointer hover:text-emerald transition-colors flex items-start gap-2"
+                                onClick={() => {
+                                  setSelectedCategory(category.id);
+                                  setOpenFAQ(faq.id);
+                                  // Find and click 'All Questions' tab to show this category expanded
+                                }}
                               >
-                                • {faq.question}
+                                <span className="text-emerald mt-1 shrink-0">•</span>
+                                <span>{faq.question}</span>
                               </div>
                             ))}
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-4 text-cricket-green border-cricket-green hover:bg-cricket-green/10"
-                          onClick={() => setSelectedCategory(category.id)}
-                        >
-                          View All {category.title} FAQs
-                        </Button>
-                      </CardContent>
-                    </Card>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-emerald border-emerald/20 hover:border-emerald hover:bg-emerald/5"
+                        onClick={() => handleCategoryClick(category.id)}
+                      >
+                        View All {category.title} FAQs
+                      </Button>
+                    </GlassCard>
                   ))}
                 </div>
               </div>
@@ -883,38 +994,37 @@ const Help = () => {
           </Tabs>
         </section>
 
-        {/* Still Need Help */}
+        {/* Bottom Banner Section */}
         <section className="mb-16">
-          <Card className="border-2 border-cricket-green/20 bg-cricket-green/5">
-            <CardContent className="p-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                Still Need Help?
-              </h3>
-              <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-                Can't find what you're looking for? Our friendly support team is
-                always ready to assist you with any questions or issues.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button 
-                  className="bg-cricket-green hover:bg-cricket-green/90"
-                  onClick={handleLiveChat}
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Start Live Chat
-                </Button>
-                <Button
-                  variant="outline"
-                  className="text-cricket-green border-cricket-green hover:bg-cricket-green/10"
-                  onClick={handleSendEmail}
-                >
-                  <Mail className="w-4 h-4 mr-2" />
-                  Send Email
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <GlassCard glow className="p-8 md:p-12 text-center border-emerald/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-emerald/5 rounded-full blur-3xl pointer-events-none" />
+
+            <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-4 font-display">
+              Still Need Help?
+            </h3>
+            <p className="text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed text-sm sm:text-base">
+              Can't find what you're looking for? Our friendly support team is always ready to assist you with booking issues or ground questions.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Button variant="glow" size="lg" onClick={handleLiveChat} className="w-full sm:w-auto">
+                <MessageCircle className="w-5 h-5 mr-2" />
+                Start Live Chat
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={handleSendEmail}
+                className="w-full sm:w-auto border-white/10 hover:border-emerald/30"
+              >
+                <Mail className="w-5 h-5 mr-2 text-emerald" />
+                Send Email
+              </Button>
+            </div>
+          </GlassCard>
         </section>
       </div>
+      <LiveChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
     </PageShell>
   );
 };
