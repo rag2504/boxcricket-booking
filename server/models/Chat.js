@@ -14,6 +14,10 @@ const messageSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  read: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const chatSchema = new mongoose.Schema(

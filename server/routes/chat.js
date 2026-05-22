@@ -135,7 +135,14 @@ If a user specifically asks to talk to a human, a real agent, or an admin, or if
 router.get('/admin/requests', async (req, res) => {
   try {
     const chats = await Chat.find({ status: { $in: ['active', 'waiting_for_admin'] } }).sort({ lastActive: -1 });
-    res.json({ success: true, chats });
+    const chatsWithUnread = chats.map(c => {
+      const unreadCount = c.messages.filter(m => m.role !== 'admin' && !m.read).length;
+      return {
+        ...c.toObject(),
+        unreadCount
+      };
+    });
+    res.json({ success: true, chats: chatsWithUnread });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -144,8 +151,21 @@ router.get('/admin/requests', async (req, res) => {
 router.get('/history/:userId', async (req, res) => {
   try {
     const chat = await Chat.findOne({ userId: req.params.userId });
-    if (!chat) return res.json({ success: true, messages: [], status: 'active' });
-    res.json({ success: true, messages: chat.messages, status: chat.status });
+    if (!chat) return res.json({ success: true, messages: [], status: 'active', unreadCount: 0 });
+    
+    // Mark messages as read
+    let updated = false;
+    chat.messages.forEach(msg => {
+      if (msg.role !== 'admin' && !msg.read) {
+        msg.read = true;
+        updated = true;
+      }
+    });
+    if (updated) {
+      await chat.save();
+    }
+    
+    res.json({ success: true, messages: chat.messages, status: chat.status, unreadCount: 0 });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

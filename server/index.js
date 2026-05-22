@@ -143,18 +143,30 @@ io.on("connection", (socket) => {
       const chat = await Chat.findOneAndUpdate(
         { userId },
         {
-          $push: { messages: { role: sender, content: message, timestamp: new Date() } },
+          $push: { messages: { role: sender, content: message, timestamp: new Date(), read: sender === 'admin' } },
           lastActive: new Date(),
           ...(sender === 'user' ? { status: 'waiting_for_admin' } : { status: 'active' })
         },
         { upsert: true, new: true }
       );
 
+      if (sender === 'admin') {
+        await Chat.updateOne(
+          { userId },
+          { $set: { "messages.$[elem].read": true } },
+          { arrayFilters: [{ "elem.role": { $ne: "admin" } }] }
+        );
+      }
+
+      const finalChat = await Chat.findOne({ userId });
+      const unreadCount = finalChat ? finalChat.messages.filter(m => m.role !== 'admin' && !m.read).length : 0;
+
       io.to("admins").emit("chat-updated", {
         userId,
         name: chat.userName || "Guest",
         email: chat.userEmail || "",
-        timestamp: chat.lastActive
+        timestamp: chat.lastActive,
+        unreadCount
       });
     } catch (e) {
       console.error('Failed to save chat message:', e);
