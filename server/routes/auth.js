@@ -113,7 +113,14 @@ router.post("/login", async (req, res) => {
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: "Invalid credentials",
+        message: "credentials or password wrong or email not found",
+      });
+    }
+
+    if (user.isActive === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is blocked, please contact support",
       });
     }
 
@@ -121,7 +128,7 @@ router.post("/login", async (req, res) => {
     if (!isPasswordValid) {
       return res.status(400).json({
         success: false,
-        message: "Invalid credentials",
+        message: "credentials or password wrong or email not found",
       });
     }
 

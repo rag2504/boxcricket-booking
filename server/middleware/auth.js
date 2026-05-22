@@ -36,6 +36,13 @@ export const authMiddleware = async (req, res, next) => {
         message: "Invalid token",
       });
     }
+    if (user.isActive === false) {
+      console.log("[AUTH] Blocked user accessed with token:", decoded.userId);
+      return res.status(401).json({
+        success: false,
+        message: "Your account is blocked, please contact support",
+      });
+    }
     req.userId = user._id;
     req.user = user;
     next();

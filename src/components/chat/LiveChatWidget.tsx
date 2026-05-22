@@ -49,13 +49,26 @@ export default function LiveChatWidget({ isOpen, onClose }: LiveChatWidgetProps)
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Create a stable anonymous user ID if not logged in
-  const userId = user?._id || localStorage.getItem("anonymousUserId") || Math.random().toString(36).substring(7);
+  const userId = user?.id || user?._id || localStorage.getItem("anonymousUserId") || Math.random().toString(36).substring(7);
   
   useEffect(() => {
-    if (!user?._id && !localStorage.getItem("anonymousUserId")) {
+    if (!user?.id && !user?._id && !localStorage.getItem("anonymousUserId")) {
       localStorage.setItem("anonymousUserId", userId);
     }
   }, [user, userId]);
+
+  // Reset messages and chat mode when the userId changes (e.g. user logins or logouts)
+  useEffect(() => {
+    setMessages([
+      {
+        id: "1",
+        role: "ai",
+        content: "Hi there! I am the CricBox AI assistant. How can I help you today?",
+        timestamp: new Date(),
+      },
+    ]);
+    setChatMode("ai");
+  }, [userId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

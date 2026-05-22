@@ -93,9 +93,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUserState(data.user!);
         toast.success("Login successful!");
       }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Login failed";
+    } catch (error: any) {
+      const message = error?.message || "Login failed";
       toast.error(message);
       throw error;
     } finally {
@@ -121,9 +120,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       throw new Error(resData.message);
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Registration failed";
+    } catch (error: any) {
+      const message = error?.message || "Registration failed";
       toast.error(message);
       throw error;
     } finally {
