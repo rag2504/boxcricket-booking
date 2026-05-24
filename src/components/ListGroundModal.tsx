@@ -70,7 +70,7 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
       { url: "", alt: "", isPrimary: false },
     ],
     features: {
-      pitchType: "Turf",
+      pitchType: "Artificial Turf",
       capacity: 22,
       lighting: false,
       parking: false,
@@ -143,7 +143,15 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
 
     try {
       setIsSubmitting(true);
-      const res = await groundsApi.registerGround(formData);
+      // Filter out images with empty URLs to avoid schema validation errors
+      const filteredImages = formData.images.filter((img) => img.url.trim() !== "");
+      // Ensure description has a default if user left it empty
+      const submitData = {
+        ...formData,
+        images: filteredImages,
+        description: formData.description.trim() || `${formData.name} - Box Cricket Ground`,
+      };
+      const res = await groundsApi.registerGround(submitData);
       if (res.success) {
         toast.success("Ground listed successfully! Admin review is pending approval.");
         onClose();
@@ -172,7 +180,7 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
             { url: "", alt: "", isPrimary: false },
           ],
           features: {
-            pitchType: "Turf",
+            pitchType: "Artificial Turf",
             capacity: 22,
             lighting: false,
             parking: false,
@@ -403,9 +411,9 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
                           <SelectValue placeholder="Select pitch type" />
                         </SelectTrigger>
                         <SelectContent className="bg-neutral-900 border-white/[0.08] text-white">
-                          <SelectItem value="Turf">Astro Turf</SelectItem>
+                          <SelectItem value="Artificial Turf">Artificial Turf</SelectItem>
+                          <SelectItem value="Synthetic">Synthetic</SelectItem>
                           <SelectItem value="Matting">Matting</SelectItem>
-                          <SelectItem value="Clay">Clay / Soil</SelectItem>
                           <SelectItem value="Concrete">Concrete</SelectItem>
                         </SelectContent>
                       </Select>
