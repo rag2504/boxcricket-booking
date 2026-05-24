@@ -6,6 +6,7 @@ import Booking from "../models/Booking.js";
 import { authMiddleware, optionalAuth } from "../middleware/auth.js";
 import { demoBookings } from "./bookings.js";
 import User from "../models/User.js";
+import Location from "../models/Location.js";
 
 const router = express.Router();
 
@@ -383,6 +384,14 @@ async function getGroundByIdHandler(req, res) {
 
         if (ground) {
           console.log("Ground found in MongoDB:", ground.name);
+          
+          if (ground.status && ground.status !== "active") {
+            console.log("Ground is not active. Status:", ground.status);
+            return res.status(404).json({
+              success: false,
+              message: "Ground not found or pending approval",
+            });
+          }
           
           try {
             // Get bookings for this ground for the next 7 days from MongoDB
@@ -773,6 +782,104 @@ router.get("/search/autocomplete", async (req, res) => {
   }
 });
 
+// Register a new ground request (public endpoint for owners)
+router.post("/register", async (req, res) => {
+  try {
+    const { owner, ...groundDataInput } = req.body;
+
+    if (!owner || !owner.email || !owner.name || !owner.contact) {
+      return res.status(400).json({ success: false, message: "Owner name, email, and contact are required" });
+    }
+
+    // Find or create owner user
+    let ownerUser = await User.findOne({ email: owner.email });
+    if (!ownerUser) {
+      // Create new user if not found
+      ownerUser = new User({
+        name: owner.name,
+        email: owner.email,
+        phone: owner.contact,
+        password: owner.password || "defaultpassword123", // Hashes on pre-save
+        role: "ground_owner",
+        isVerified: true,
+      });
+      await ownerUser.save();
+    } else {
+      ownerUser.role = "ground_owner";
+      if (owner.password && owner.password.trim()) {
+        ownerUser.password = owner.password;
+      }
+      await ownerUser.save();
+    }
+
+    // Resolve location data using cityId
+    let locationData = groundDataInput.location;
+    if (locationData && locationData.cityId) {
+      const city = await Location.findOne({ id: locationData.cityId });
+      if (city) {
+        locationData = {
+          ...locationData,
+          cityName: city.name,
+          state: city.state,
+          latitude: city.latitude,
+          longitude: city.longitude,
+        };
+      } else {
+        return res.status(400).json({ success: false, message: "Invalid cityId provided" });
+      }
+    } else {
+      return res.status(400).json({ success: false, message: "Location with cityId is required" });
+    }
+
+    // Prepare ground data with pending status
+    const groundData = {
+      ...groundDataInput,
+      location: locationData,
+      owner: {
+        userId: ownerUser._id,
+        name: owner.name,
+        contact: owner.contact,
+        email: owner.email,
+        verified: false, // Not verified until admin accepts
+      },
+      availability: groundDataInput.availability || {
+        timeSlots: ["06:00-07:00","07:00-08:00","08:00-09:00","09:00-10:00","10:00-11:00","11:00-12:00","12:00-13:00","13:00-14:00","14:00-15:00","15:00-16:00","16:00-17:00","17:00-18:00","18:00-19:00","19:00-20:00","20:00-21:00","21:00-22:00"],
+        blockedDates: [],
+        weeklySchedule: {
+          monday: { isOpen: true, slots: ["06:00-07:00","07:00-08:00","08:00-09:00","09:00-10:00","10:00-11:00","11:00-12:00","12:00-13:00","13:00-14:00","14:00-15:00","15:00-16:00","16:00-17:00","17:00-18:00","18:00-19:00","19:00-20:00","20:00-21:00","21:00-22:00"] },
+          tuesday: { isOpen: true, slots: ["06:00-07:00","07:00-08:00","08:00-09:00","09:00-10:00","10:00-11:00","11:00-12:00","12:00-13:00","13:00-14:00","14:00-15:00","15:00-16:00","16:00-17:00","17:00-18:00","18:00-19:00","19:00-20:00","20:00-21:00","21:00-22:00"] },
+          wednesday: { isOpen: true, slots: ["06:00-07:00","07:00-08:00","08:00-09:00","09:00-10:00","10:00-11:00","11:00-12:00","12:00-13:00","13:00-14:00","14:00-15:00","15:00-16:00","16:00-17:00","17:00-18:00","18:00-19:00","19:00-20:00","20:00-21:00","21:00-22:00"] },
+          thursday: { isOpen: true, slots: ["06:00-07:00","07:00-08:00","08:00-09:00","09:00-10:00","10:00-11:00","11:00-12:00","12:00-13:00","13:00-14:00","14:00-15:00","15:00-16:00","16:00-17:00","17:00-18:00","18:00-19:00","19:00-20:00","20:00-21:00","21:00-22:00"] },
+          friday: { isOpen: true, slots: ["06:00-07:00","07:00-08:00","08:00-09:00","09:00-10:00","10:00-11:00","11:00-12:00","12:00-13:00","13:00-14:00","14:00-15:00","15:00-16:00","16:00-17:00","17:00-18:00","18:00-19:00","19:00-20:00","20:00-21:00","21:00-22:00"] },
+          saturday: { isOpen: true, slots: ["06:00-07:00","07:00-08:00","08:00-09:00","09:00-10:00","10:00-11:00","11:00-12:00","12:00-13:00","13:00-14:00","14:00-15:00","15:00-16:00","16:00-17:00","17:00-18:00","18:00-19:00","19:00-20:00","20:00-21:00","21:00-22:00"] },
+          sunday: { isOpen: true, slots: ["06:00-07:00","07:00-08:00","08:00-09:00","09:00-10:00","10:00-11:00","11:00-12:00","12:00-13:00","13:00-14:00","14:00-15:00","15:00-16:00","16:00-17:00","17:00-18:00","18:00-19:00","19:00-20:00","20:00-21:00","21:00-22:00"] }
+        }
+      },
+      status: "pending",
+      isVerified: false,
+      totalBookings: 0,
+      policies: groundDataInput.policies || {
+        cancellation: "Free cancellation up to 24 hours before booking",
+        rules: [],
+        advanceBooking: 30,
+      },
+      amenities: groundDataInput.amenities || [],
+      rating: groundDataInput.rating || {
+        average: 0,
+        count: 0,
+        reviews: [],
+      },
+    };
+
+    const ground = new Ground(groundData);
+    await ground.save();
+    res.json({ success: true, ground });
+  } catch (error) {
+    console.error("Ground registration error:", error);
+    res.status(500).json({ success: false, message: "Failed to register ground", error: error.message });
+  }
+});
+
 // Create a new ground
 router.post("/", async (req, res) => {
   try {
@@ -968,9 +1075,6 @@ async function getAllGroundsAdminHandler(req, res) {
 // --- ADMIN ROUTER ---
 // This router exposes the same GET endpoints as the main grounds router, but under /api/admin/grounds for admin panel use.
 const adminRouter = express.Router();
-
-// Import required models for admin operations
-import Location from "../models/Location.js";
 
 // Simple admin auth middleware (in production, use proper JWT validation)
 const adminAuth = (req, res, next) => {

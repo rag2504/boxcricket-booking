@@ -7,8 +7,12 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { staggerContainer, staggerItem } from "@/lib/motion";
+import { useState } from "react";
+import ListGroundModal from "@/components/ListGroundModal";
 
 const About = () => {
+  const [isListModalOpen, setIsListModalOpen] = useState(false);
+
   const features = [
     {
       icon: <Target className="w-8 h-8 text-cricket-green" />,
@@ -202,11 +206,22 @@ const About = () => {
               <Button variant="glow" size="lg" asChild>
                 <Link to="/">Find Grounds</Link>
               </Button>
-              <Button variant="outline" size="lg">List Your Ground</Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setIsListModalOpen(true)}
+              >
+                List Your Ground
+              </Button>
             </div>
           </GlassCard>
         </div>
       </section>
+
+      <ListGroundModal
+        isOpen={isListModalOpen}
+        onClose={() => setIsListModalOpen(false)}
+      />
     </PageShell>
   );
 };

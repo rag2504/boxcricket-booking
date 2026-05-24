@@ -109,6 +109,8 @@ export const groundsApi = {
 
   searchAutocomplete: (q: string) =>
     api.get("/grounds/search/autocomplete", { params: { q } }),
+
+  registerGround: (data: any) => api.post("/grounds/register", data),
 };
 
 export const bookingsApi = {
