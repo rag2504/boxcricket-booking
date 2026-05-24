@@ -137,8 +137,8 @@ const Navbar = ({
             <Link to="/" className="group flex shrink-0 items-center gap-3">
               <div className="relative">
                 <div className="absolute inset-0 rounded-xl bg-emerald/30 blur-md opacity-0 transition-opacity group-hover:opacity-100" />
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald to-emerald-light shadow-glow-sm">
-                  <span className="font-display text-sm font-bold text-white">CB</span>
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden border border-white/10 shadow-glow-sm">
+                  <img src="/newLogo.jpeg" alt="CricBox Logo" className="h-full w-full object-cover" />
                 </div>
               </div>
               <div className="hidden sm:block">

@@ -245,7 +245,7 @@ const PaymentModal = ({
         currency: order.currency || "INR",
         name: "CricBox",
         description: "Box Cricket Booking Payment",
-        image: "/logo.png",
+        image: "/newLogo.jpeg",
         prefill: {
           name: prefill?.name || user.name || booking.playerDetails.contactPerson.name,
           email: prefill?.email || user.email || booking.playerDetails.contactPerson.email,

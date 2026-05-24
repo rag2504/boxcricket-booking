@@ -54,8 +54,8 @@ export function PageLoader({
           />
 
           {/* Center logo */}
-          <div className="absolute flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald to-emerald-light shadow-glow-sm">
-            <span className="font-display text-lg font-bold text-white">CB</span>
+          <div className="absolute flex h-14 w-14 items-center justify-center rounded-2xl overflow-hidden border border-white/10 shadow-glow-sm">
+            <img src="/newLogo.jpeg" alt="CricBox Logo" className="h-full w-full object-cover" />
           </div>
         </div>
 

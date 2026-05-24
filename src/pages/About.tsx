@@ -57,21 +57,13 @@ const About = () => {
 
   const team = [
     {
-      name: "Rajesh Kumar",
+      name: "Rag Raichura",
       role: "Founder & CEO",
-      bio: "Former state-level cricketer passionate about making cricket accessible to everyone.",
-      image:
-        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+      bio: "Passionate about making cricket accessible and revolutionizing the ground booking experience.",
+      image: "/rag.jpeg",
     },
     {
-      name: "Priya Sharma",
-      role: "Head of Operations",
-      bio: "Ensuring quality standards and smooth operations across all partner grounds.",
-      image:
-        "https://images.unsplash.com/photo-1494790108755-2616b612b77c?w=150&h=150&fit=crop&crop=face",
-    },
-    {
-      name: "Amit Patel",
+      name: "Tanish Kagathara",
       role: "Tech Lead",
       bio: "Building the platform that connects cricket lovers with their perfect playing grounds.",
       image:
@@ -186,7 +178,7 @@ const About = () => {
               Passionate cricket enthusiasts revolutionizing ground booking.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {team.map((member, index) => (
               <GlassCard key={index} hover className="p-6 text-center">
                 <img src={member.image} alt={member.name} className="w-20 h-20 rounded-full mx-auto mb-4 object-cover ring-2 ring-emerald/30" />

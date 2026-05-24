@@ -58,8 +58,8 @@ export function RouteLoader() {
             </svg>
 
             {/* Center logo */}
-            <div className="absolute flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald to-emerald-light shadow-glow-sm">
-              <span className="font-display text-sm font-bold text-white">CB</span>
+            <div className="absolute flex h-12 w-12 items-center justify-center rounded-xl overflow-hidden border border-white/10 shadow-glow-sm">
+              <img src="/newLogo.jpeg" alt="CricBox Logo" className="h-full w-full object-cover" />
             </div>
           </div>
         </motion.div>

@@ -374,7 +374,10 @@ const BookingDetails = () => {
           </head>
           <body>
             <div class="header">
-              <div class="logo">🏏 BoxCric</div>
+              <div style="display: flex; justify-content: center; align-items: center; gap: 12px; margin-bottom: 10px;">
+                <img src="/newLogo.jpeg" style="height: 44px; width: 44px; object-fit: cover; border-radius: 8px;" />
+                <span style="font-size: 28px; font-weight: bold; color: #22c55e;">BoxCric</span>
+              </div>
               <div class="tagline">Book. Play. Win.</div>
               <div class="receipt-title">BOOKING RECEIPT</div>
               <div class="receipt-date">${new Date().toLocaleDateString('en-IN', {

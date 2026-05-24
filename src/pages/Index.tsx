@@ -16,7 +16,6 @@ import { isMongoObjectId } from "@/lib/utils";
 import { bookingsApi } from "@/lib/api";
 import { getApiBaseUrl } from "@/lib/config";
 import PageShell from "@/components/layout/PageShell";
-import { PageLoader } from "@/components/ui/page-loader";
 import HeroSection from "@/components/landing/HeroSection";
 import BookingTicker from "@/components/landing/BookingTicker";
 import GroundsListingSection from "@/components/landing/GroundsListingSection";
@@ -77,13 +76,7 @@ const Index = () => {
     }
   });
 
-  const [isPageLoading, setIsPageLoading] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsPageLoading(false), 1200);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     const onScroll = () => setShowScrollTop(window.scrollY > 300);
@@ -390,10 +383,6 @@ const Index = () => {
 
   return (
     <PageShell>
-      <AnimatePresence>
-        {isPageLoading && <PageLoader />}
-      </AnimatePresence>
-
       <Navbar
         selectedCity={selectedCity?.name}
         onCitySelect={() => setLocationSelectorOpen(true)}

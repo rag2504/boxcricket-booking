@@ -163,7 +163,7 @@ export async function openRazorpayCheckout(
     currency = "INR",
     name = "CricBox",
     description = "Box Cricket Booking Payment",
-    image = "/logo.png",
+    image = "/newLogo.jpeg",
     prefill,
     onSuccess,
     onDismiss,
