@@ -11,6 +11,9 @@ import {
   Loader2,
   Users,
   ShieldAlert,
+  CheckCircle2,
+  Mail,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +49,9 @@ const ease = [0.22, 1, 0.36, 1] as const;
 export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProps) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     name: "",
@@ -88,6 +94,14 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
     },
   });
 
+  // Validation helpers
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidPhone = (phone: string) => /^[6-9]\d{9}$/.test(phone.replace(/\s+/g, ""));
+  const isValidPincode = (pin: string) => /^\d{6}$/.test(pin.trim());
+  const isValidUrl = (url: string) => {
+    try { new URL(url); return true; } catch { return false; }
+  };
+
   const updateComplementaryRange = (rangeIndex: number, field: "start" | "end", value: string) => {
     const newRanges = [...formData.price.ranges];
     if (rangeIndex === 0) {
@@ -105,27 +119,43 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
   };
 
   const handleNext = () => {
-    // Basic validation per step
+    const newErrors: Record<string, string> = {};
+
     if (step === 1) {
-      if (
-        !formData.owner.name.trim() ||
-        !formData.owner.email.trim() ||
-        !formData.owner.contact.trim() ||
-        !formData.owner.password.trim() ||
-        !formData.name.trim()
-      ) {
-        toast.error("Please fill in all required basic details & owner information.");
-        return;
-      }
+      // Owner validations
+      if (!formData.owner.name.trim()) newErrors.ownerName = "Owner name is required";
+      else if (formData.owner.name.trim().length < 3) newErrors.ownerName = "Name must be at least 3 characters";
+
+      if (!formData.owner.email.trim()) newErrors.ownerEmail = "Email is required";
+      else if (!isValidEmail(formData.owner.email)) newErrors.ownerEmail = "Please enter a valid email address";
+
+      if (!formData.owner.contact.trim()) newErrors.ownerContact = "Phone number is required";
+      else if (!isValidPhone(formData.owner.contact)) newErrors.ownerContact = "Enter a valid 10-digit Indian mobile number";
+
+      if (!formData.owner.password.trim()) newErrors.ownerPassword = "Password is required";
+      else if (formData.owner.password.length < 6) newErrors.ownerPassword = "Password must be at least 6 characters";
+
+      if (!confirmPassword.trim()) newErrors.confirmPassword = "Please confirm your password";
+      else if (formData.owner.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
+
+      // Ground validations
+      if (!formData.name.trim()) newErrors.groundName = "Ground name is required";
+      else if (formData.name.trim().length < 3) newErrors.groundName = "Ground name must be at least 3 characters";
+
+      if (formData.features.capacity < 2) newErrors.capacity = "Capacity must be at least 2 players";
     } else if (step === 2) {
-      if (
-        !formData.location.cityId ||
-        !formData.location.address.trim() ||
-        !formData.location.pincode.trim()
-      ) {
-        toast.error("Please specify complete location details.");
-        return;
-      }
+      if (!formData.location.cityId) newErrors.city = "Please select a city";
+      if (!formData.location.address.trim()) newErrors.address = "Address is required";
+      if (!formData.location.pincode.trim()) newErrors.pincode = "Pincode is required";
+      else if (!isValidPincode(formData.location.pincode)) newErrors.pincode = "Enter a valid 6-digit pincode";
+
+      if (formData.price.ranges.some(r => r.perHour <= 0)) newErrors.price = "Hourly rate must be greater than ₹0";
+    }
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      toast.error(Object.values(newErrors)[0]);
+      return;
     }
     setStep((prev) => prev + 1);
   };
@@ -136,8 +166,24 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: Record<string, string> = {};
+
     if (!formData.images[0].url.trim()) {
-      toast.error("Primary Ground Image URL is required.");
+      newErrors.primaryImage = "Primary Ground Image URL is required";
+    } else if (!isValidUrl(formData.images[0].url)) {
+      newErrors.primaryImage = "Please enter a valid image URL";
+    }
+
+    // Validate optional image URLs if provided
+    formData.images.slice(1).forEach((img, idx) => {
+      if (img.url.trim() && !isValidUrl(img.url)) {
+        newErrors[`image${idx + 2}`] = `Image ${idx + 2} URL is not valid`;
+      }
+    });
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      toast.error(Object.values(newErrors)[0]);
       return;
     }
 
@@ -153,50 +199,7 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
       };
       const res = await groundsApi.registerGround(submitData);
       if (res.success) {
-        toast.success("Ground listed successfully! Admin review is pending approval.");
-        onClose();
-        // Reset form
-        setStep(1);
-        setFormData({
-          name: "",
-          description: "",
-          location: {
-            address: "",
-            cityId: "",
-            cityName: "",
-            state: "",
-            pincode: "",
-          },
-          price: {
-            ranges: [
-              { start: "20:00", end: "08:00", perHour: 500 },
-              { start: "08:00", end: "20:00", perHour: 400 },
-            ],
-            discount: 0,
-          },
-          images: [
-            { url: "", alt: "", isPrimary: true },
-            { url: "", alt: "", isPrimary: false },
-            { url: "", alt: "", isPrimary: false },
-          ],
-          features: {
-            pitchType: "Artificial Turf",
-            capacity: 22,
-            lighting: false,
-            parking: false,
-            changeRoom: false,
-            washroom: false,
-            cafeteria: false,
-            equipment: false,
-          },
-          amenities: [],
-          owner: {
-            name: "",
-            email: "",
-            contact: "",
-            password: "",
-          },
-        });
+        setIsSuccess(true);
       } else {
         toast.error(res.message || "Failed to list ground.");
       }
@@ -208,8 +211,56 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
     }
   };
 
+  const handleCloseModal = () => {
+    setIsSuccess(false);
+    setStep(1);
+    setConfirmPassword("");
+    setErrors({});
+    setFormData({
+      name: "",
+      description: "",
+      location: {
+        address: "",
+        cityId: "",
+        cityName: "",
+        state: "",
+        pincode: "",
+      },
+      price: {
+        ranges: [
+          { start: "20:00", end: "08:00", perHour: 500 },
+          { start: "08:00", end: "20:00", perHour: 400 },
+        ],
+        discount: 0,
+      },
+      images: [
+        { url: "", alt: "", isPrimary: true },
+        { url: "", alt: "", isPrimary: false },
+        { url: "", alt: "", isPrimary: false },
+      ],
+      features: {
+        pitchType: "Artificial Turf",
+        capacity: 22,
+        lighting: false,
+        parking: false,
+        changeRoom: false,
+        washroom: false,
+        cafeteria: false,
+        equipment: false,
+      },
+      amenities: [],
+      owner: {
+        name: "",
+        email: "",
+        contact: "",
+        password: "",
+      },
+    });
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleCloseModal}>
       <DialogContent
         className={cn(
           "max-w-2xl p-0 overflow-hidden border-white/[0.08] bg-[#0a0a0a]/95 shadow-glass-lg backdrop-blur-2xl text-white max-h-[90vh] flex flex-col",
@@ -223,6 +274,74 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-emerald/10 blur-3xl" />
         <div className="noise-overlay pointer-events-none absolute inset-0 opacity-20" />
+
+        {isSuccess ? (
+          /* ───── SUCCESS SCREEN ───── */
+          <div className="relative z-10 flex flex-col items-center justify-center py-12 px-8 text-center space-y-6">
+            <DialogTitle className="sr-only">Request Submitted</DialogTitle>
+            <DialogDescription className="sr-only">Your ground listing request has been submitted successfully.</DialogDescription>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
+              className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald/15 border-2 border-emerald/30"
+            >
+              <CheckCircle2 className="w-10 h-10 text-emerald" />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="space-y-2"
+            >
+              <h3 className="text-xl font-bold text-white">Request Submitted Successfully!</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Your ground listing request has been received. Our admin team will verify the details and get back to you.
+              </p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="w-full max-w-sm space-y-3"
+            >
+              <div className="flex items-center gap-3 p-3 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/15">
+                  <Mail className="w-4 h-4 text-blue-400" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-medium text-white">Email Notification</p>
+                  <p className="text-[10px] text-muted-foreground">You'll receive an update at {formData.owner.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-500/15">
+                  <MessageSquare className="w-4 h-4 text-green-400" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-medium text-white">WhatsApp Notification</p>
+                  <p className="text-[10px] text-muted-foreground">Status updates on +91 {formData.owner.contact}</p>
+                </div>
+              </div>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+              className="pt-2"
+            >
+              <p className="text-[10px] text-muted-foreground mb-4">Typical verification takes 24-48 hours</p>
+              <Button
+                onClick={handleCloseModal}
+                className="bg-emerald text-black hover:bg-emerald/90 font-medium px-8"
+              >
+                <Check className="w-4 h-4 mr-1.5" />
+                Done
+              </Button>
+            </motion.div>
+          </div>
+        ) : (
+          <>
 
         <DialogHeader className="relative z-10 px-6 pt-6 pb-4 border-b border-white/[0.05] shrink-0">
           <div className="flex items-center gap-3">
@@ -292,16 +411,18 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
                       </label>
                       <Input
                         value={formData.owner.name}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData({
                             ...formData,
                             owner: { ...formData.owner, name: e.target.value },
-                          })
-                        }
+                          });
+                          if (errors.ownerName) setErrors(prev => { const n = {...prev}; delete n.ownerName; return n; });
+                        }}
                         placeholder="Owner full name"
-                        className="bg-white/[0.03] border-white/[0.08]"
+                        className={cn("bg-white/[0.03] border-white/[0.08]", errors.ownerName && "border-red-500/50")}
                         required
                       />
+                      {errors.ownerName && <p className="text-[10px] text-red-400">{errors.ownerName}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-medium text-muted-foreground block">
@@ -310,51 +431,87 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
                       <Input
                         type="email"
                         value={formData.owner.email}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData({
                             ...formData,
                             owner: { ...formData.owner, email: e.target.value },
-                          })
-                        }
+                          });
+                          if (errors.ownerEmail) setErrors(prev => { const n = {...prev}; delete n.ownerEmail; return n; });
+                        }}
                         placeholder="owner@domain.com"
-                        className="bg-white/[0.03] border-white/[0.08]"
+                        className={cn("bg-white/[0.03] border-white/[0.08]", errors.ownerEmail && "border-red-500/50")}
                         required
                       />
+                      {errors.ownerEmail && <p className="text-[10px] text-red-400">{errors.ownerEmail}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-medium text-muted-foreground block">
-                        Contact / Phone Number *
+                        Mobile Number * <span className="text-muted-foreground/60">(10 digits)</span>
                       </label>
-                      <Input
-                        value={formData.owner.contact}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            owner: { ...formData.owner, contact: e.target.value },
-                          })
-                        }
-                        placeholder="Enter 10 digit number"
-                        className="bg-white/[0.03] border-white/[0.08]"
-                        required
-                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground bg-white/[0.05] px-2.5 py-2 rounded-md border border-white/[0.08]">+91</span>
+                        <Input
+                          value={formData.owner.contact}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                            setFormData({
+                              ...formData,
+                              owner: { ...formData.owner, contact: val },
+                            });
+                            if (errors.ownerContact) setErrors(prev => { const n = {...prev}; delete n.ownerContact; return n; });
+                          }}
+                          placeholder="9876543210"
+                          maxLength={10}
+                          className={cn("bg-white/[0.03] border-white/[0.08] flex-1", errors.ownerContact && "border-red-500/50")}
+                          required
+                        />
+                      </div>
+                      {formData.owner.contact && (
+                        <p className={cn("text-[10px]", formData.owner.contact.length === 10 ? "text-emerald/70" : "text-muted-foreground/60")}>
+                          {formData.owner.contact.length}/10 digits
+                        </p>
+                      )}
+                      {errors.ownerContact && <p className="text-[10px] text-red-400">{errors.ownerContact}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-medium text-muted-foreground block">
-                        Create Password *
+                        Create Password * <span className="text-muted-foreground/60">(min 6 chars)</span>
                       </label>
                       <Input
                         type="password"
                         value={formData.owner.password}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData({
                             ...formData,
                             owner: { ...formData.owner, password: e.target.value },
-                          })
-                        }
-                        placeholder="Password for Owner Panel"
-                        className="bg-white/[0.03] border-white/[0.08]"
+                          });
+                          if (errors.ownerPassword) setErrors(prev => { const n = {...prev}; delete n.ownerPassword; return n; });
+                        }}
+                        placeholder="Min 6 characters"
+                        className={cn("bg-white/[0.03] border-white/[0.08]", errors.ownerPassword && "border-red-500/50")}
                         required
                       />
+                      {errors.ownerPassword && <p className="text-[10px] text-red-400">{errors.ownerPassword}</p>}
+                    </div>
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-xs font-medium text-muted-foreground block">
+                        Confirm Password *
+                      </label>
+                      <Input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          if (errors.confirmPassword) setErrors(prev => { const n = {...prev}; delete n.confirmPassword; return n; });
+                        }}
+                        placeholder="Re-enter your password"
+                        className={cn("bg-white/[0.03] border-white/[0.08]", errors.confirmPassword && "border-red-500/50")}
+                        required
+                      />
+                      {errors.confirmPassword && <p className="text-[10px] text-red-400">{errors.confirmPassword}</p>}
+                      {confirmPassword && formData.owner.password === confirmPassword && (
+                        <p className="text-[10px] text-emerald/70 flex items-center gap-1"><Check className="w-3 h-3" /> Passwords match</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -816,6 +973,8 @@ export default function ListGroundModal({ isOpen, onClose }: ListGroundModalProp
             </Button>
           )}
         </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

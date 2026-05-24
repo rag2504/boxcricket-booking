@@ -411,7 +411,27 @@ const GroundDetails = () => {
                 {isFavorite ? "Saved" : "Save"}
               </span>
             </Button>
-            <Button variant="glass" size="sm">
+            <Button variant="glass" size="sm" onClick={async () => {
+              const shareUrl = window.location.href;
+              const shareData = {
+                title: `${safeGround.name} - CricBox`,
+                text: `Check out ${safeGround.name} on CricBox! 🏏\n📍 ${safeGround.location.address}\n⭐ ${safeGround.rating.average} rating`,
+                url: shareUrl,
+              };
+              try {
+                if (navigator.share) {
+                  await navigator.share(shareData);
+                } else {
+                  await navigator.clipboard.writeText(shareUrl);
+                  toast.success("Link copied to clipboard!");
+                }
+              } catch (err: any) {
+                if (err.name !== "AbortError") {
+                  await navigator.clipboard.writeText(shareUrl);
+                  toast.success("Link copied to clipboard!");
+                }
+              }
+            }}>
               <Share2 className="w-4 h-4" />
               <span className="hidden sm:inline">Share</span>
             </Button>
