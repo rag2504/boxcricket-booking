@@ -249,6 +249,23 @@ CASHFREE_API_URL=https://api.cashfree.com/pg
 
 ---
 
+## ⏰ Render Keep Alive
+
+**Why Render free tier sleeps:** Render's free web services automatically spin down after 15 minutes of inactivity. This causes a "cold start" delay (often 30+ seconds) for the next user who visits the site.
+
+**How GitHub Actions prevents cold starts:** We have implemented a GitHub Actions workflow (`.github/workflows/keep_alive.yml`) that automatically pings the backend's `/health` endpoint every 10 minutes. This continuous activity prevents Render from putting the service to sleep, ensuring your API remains fast and responsive at all times.
+
+**How to configure GitHub Secrets:**
+1. Open your GitHub Repository in the browser.
+2. Go to **Settings** → **Secrets and Variables** → **Actions**.
+3. Click **New repository secret**.
+4. Set the Secret Name: `BACKEND_URL`
+5. Set the Secret Value to your Render Backend URL (e.g., `https://box-junu.onrender.com`).
+6. Push your code to GitHub.
+7. Go to the **Actions** tab to verify the workflow execution.
+
+---
+
 ## 🔧 Development Scripts
 
 ```bash

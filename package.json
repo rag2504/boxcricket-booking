@@ -19,7 +19,8 @@
     "start:render": "NODE_ENV=production PORT=${PORT:-10000} node server/index.js",
     "test": "vitest --run",
     "format.fix": "prettier --write .",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "seed": "node server/seeders/seedData.js"
   },
   "resolutions": {
     "@rollup/rollup-linux-x64-gnu": "^3.0.0"

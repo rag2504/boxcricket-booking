@@ -33,6 +33,14 @@ const DEFAULT_TIME_SLOTS = [
   "18:00-19:00", "19:00-20:00", "20:00-21:00", "21:00-22:00"
 ];
 
+function derivePerHour(price) {
+  if (price?.perHour) return price.perHour;
+  if (Array.isArray(price?.ranges) && price.ranges.length > 0) {
+    return price.ranges[0].perHour;
+  }
+  return 0;
+}
+
 // Map MongoDB ground to fallback structure
 function mapMongoGroundToFallback(groundDoc, bookingsByDate = {}) {
   if (!groundDoc) return null;
@@ -65,7 +73,7 @@ function mapMongoGroundToFallback(groundDoc, bookingsByDate = {}) {
       pincode: g.location?.pincode || '',
     },
     price: {
-      perHour: g.price?.perHour || 0,
+      perHour: derivePerHour(g.price),
       currency: g.price?.currency || 'INR',
       discount: g.price?.discount || 0,
       ranges: g.price?.ranges || [],

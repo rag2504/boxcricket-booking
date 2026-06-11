@@ -221,6 +221,7 @@ import { healthCheck } from "./lib/healthCheck.js";
 
 // Health Check endpoint
 app.get("/api/health", healthCheck);
+app.get("/health", healthCheck);
 
 /** Lightweight connectivity check (used by SPA dev / monitoring). */
 app.get("/api/test", (req, res) => {

@@ -1,0 +1,40 @@
+name: Keep Backend Alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping_backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate Environment
+        run: |
+          if [ -z "${{ secrets.BACKEND_URL }}" ]; then
+            echo "Error: BACKEND_URL secret is not configured in GitHub Actions."
+            echo "Please go to Settings -> Secrets and Variables -> Actions to add it."
+            exit 1
+          fi
+          
+          if ! echo "${{ secrets.BACKEND_URL }}" | grep -qE '^https?://'; then
+            echo "Error: BACKEND_URL is malformed. It must start with http:// or https://."
+            exit 1
+          fi
+
+      - name: Ping Backend
+        run: |
+          echo "Pinging backend health endpoint..."
+          # Fetch the HTTP status code
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.BACKEND_URL }}/health")
+          
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Backend is active. Received HTTP 200."
+            exit 0
+          else
+            echo "❌ Failed to reach backend. Expected HTTP 200, got HTTP $HTTP_STATUS."
+            # Note: We still curl normally to show the error output if it failed
+            curl -f "${{ secrets.BACKEND_URL }}/health" || true
+            exit 1
+          fi
